@@ -1,0 +1,103 @@
+input to the gemini
+{
+  "report_id": "VN-IND-20260906-00142",
+
+  "source": {
+    "type": "citizen_report",
+    "device_id": "anonymous_device_82A",
+    "timestamp": "2026-09-06T10:42:18+05:30"
+  },
+
+  "location": {
+    "latitude": 22.7196,
+    "longitude": 75.8577,
+    "accuracy_m": 8
+  },
+
+  "image": {
+    "file_uri": "firebase://reports/VN-IND-20260906-00142.jpg",
+    "mime_type": "image/jpeg"
+  },
+
+  "sensor_data": {
+    "pm25_ug_m3": 186.4,
+    "pm10_ug_m3": 312.7,
+    "temperature_c": 31.2,
+    "humidity_percent": 48.5
+  },
+
+  "meteorological_data": {
+    "wind_speed_mps": 4.2,
+    "wind_direction_deg": 275
+  },
+
+  "analysis_request": {
+    "detect_pollution_source": true,
+    "verify_visual_evidence": true,
+    "estimate_severity": true,
+    "detect_duplicate": true,
+    "generate_authority_alert": true
+  }
+}
+
+
+
+------------------------------------------------------------
+
+output of the gemini and input at the admin end:
+
+{
+  "report_id": "VN-IND-20260906-00142",
+
+  "verification": {
+    "status": "VERIFIED",
+    "confidence": 0.94,
+    "is_duplicate": false,
+    "is_spam": false
+  },
+
+  "pollution_event": {
+    "type": "CROP_BURNING",
+    "subtype": "STUBBLE_BURNING",
+    "severity": "HIGH",
+
+    "visual_evidence": {
+      "smoke_detected": true,
+      "flame_detected": true,
+      "dense_smoke": true
+    }
+  },
+
+  "location": {
+    "latitude": 22.7196,
+    "longitude": 75.8577,
+    "accuracy_m": 8,
+    "area": "Indore",
+    "corridor": "Indore-Pithampur"
+  },
+
+  "environment": {
+    "pm25_ug_m3": 186.4,
+    "pm10_ug_m3": 312.7,
+    "wind_speed_mps": 4.2,
+    "wind_direction_deg": 275
+  },
+
+  "impact_assessment": {
+    "estimated_spread": "MODERATE",
+    "population_risk": "HIGH",
+    "expected_air_quality_impact": "SIGNIFICANT"
+  },
+
+  "response": {
+    "priority": "P1_CRITICAL",
+    "recommended_action": "FIELD_INSPECTION",
+    "authority": "MP_POLLUTION_CONTROL_BOARD",
+    "alert_required": true
+  },
+
+  "ai_metadata": {
+    "model": "Gemini",
+    "analysis_timestamp": "2026-09-06T10:42:21+05:30"
+  }
+}
