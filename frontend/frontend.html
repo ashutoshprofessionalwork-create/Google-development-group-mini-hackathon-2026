@@ -1513,10 +1513,14 @@ function LeafletMapContainer({ zones, selectedCoords, onSelectLocation }) {
     markersGroup.current.clearLayers();
 
     zones.forEach(zone => {
+      const isStation = zone.type && zone.type.includes("Station");
       let markerColor = "#22C55E";
       let radiusSize = 600;
 
-      if (zone.complaints >= 50) {
+      if (isStation) {
+        markerColor = "#2563EB"; // Blue for CPCB/MPPCB Stations
+        radiusSize = 1000;
+      } else if (zone.complaints >= 50) {
         markerColor = "#EF4444";
         radiusSize = 2000;
       } else if (zone.complaints >= 10) {
@@ -1527,23 +1531,29 @@ function LeafletMapContainer({ zones, selectedCoords, onSelectLocation }) {
       L.circle([zone.lat, zone.lng], {
         color: markerColor,
         fillColor: markerColor,
-        fillOpacity: 0.25,
+        fillOpacity: isStation ? 0.15 : 0.25,
         radius: radiusSize,
-        weight: 2
+        weight: isStation ? 3 : 2
       }).addTo(markersGroup.current);
 
       const icon = L.divIcon({
         className: "",
-        html: `<div class="dot-marker" style="background:${markerColor}">${zone.complaints}</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        html: isStation 
+          ? `<div style="background:#1E40AF; color:#FFF; font-weight:800; font-size:10px; padding:3px 6px; border-radius:10px; border:2px solid #FFF; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.3);">📡 AQI ${zone.aqi}</div>`
+          : `<div class="dot-marker" style="background:${markerColor}">${zone.complaints}</div>`,
+        iconSize: isStation ? [70, 22] : [24, 24],
+        iconAnchor: isStation ? [35, 11] : [12, 12]
       });
 
       const marker = L.marker([zone.lat, zone.lng], { icon }).addTo(markersGroup.current);
       marker.bindPopup(`
-        <div style="font-family: 'IBM Plex Sans', sans-serif; min-width: 160px;">
-          <h4 style="margin: 0 0 4px; font-size: 14px;">${zone.name}</h4>
-          <div style="font-size: 12px; margin-top: 4px;">Registered Complaints: <strong>${zone.complaints}</strong></div>
+        <div style="font-family: 'IBM Plex Sans', sans-serif; min-width: 180px;">
+          <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: ${isStation ? '#2563EB' : '#D97706'};">
+            ${zone.type || "Citizen Hotspot Zone"}
+          </div>
+          <h4 style="margin: 2px 0 6px; font-size: 14px;">${zone.name}</h4>
+          ${zone.aqi ? `<div style="font-size: 12px; font-weight: 700; background: #EEF2FF; padding: 4px 8px; border-radius: 4px; border: 1px solid #C7D2FE;">Station AQI Reading: <span style="color:#1E40AF">${zone.aqi}</span></div>` : ''}
+          <div style="font-size: 12px; margin-top: 6px;">Registered Citizen Complaints: <strong>${zone.complaints}</strong></div>
         </div>
       `);
     });
