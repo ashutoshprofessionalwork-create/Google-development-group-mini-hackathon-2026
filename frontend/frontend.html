@@ -249,6 +249,28 @@ function App() {
     return { label: `📌 MODERATE (Sev ${score}/10)`, color: "#854D0E", bg: "#FEF08A", border: "#EAB308" };
   };
 
+  const renderVerificationBadge = (r) => {
+    if (r.status === "ADMIN VERIFIED") {
+      return (
+        <span className="badge-status badge-verified" style={{ background: "#FEF08A", color: "#854D0E", borderColor: "#EAB308", fontWeight: 800 }}>
+          🛡️ ADMIN VERIFIED
+        </span>
+      );
+    } else if (r.status === "REJECTED") {
+      return (
+        <span className="badge-status badge-rejected" style={{ background: "#FEE2E2", color: "#991B1B", borderColor: "#EF4444", fontWeight: 800 }}>
+          ❌ REJECTED
+        </span>
+      );
+    } else {
+      return (
+        <span className="badge-status" style={{ background: "#E0F2FE", color: "#0369A1", borderColor: "#38BDF8", fontWeight: 800 }}>
+          🤖 AI VERIFIED ({r.report_count || 1} Reports)
+        </span>
+      );
+    }
+  };
+
   const sortedReports = [...reports].sort((a, b) => {
     if (sortBySeverity) {
       return getSeverityScore(b) - getSeverityScore(a);
@@ -771,13 +793,11 @@ function App() {
                   return (
                     <div key={r.id} style={{ border: `2px solid ${badge.border}`, borderRadius: 8, padding: 16, background: "#FFF", boxShadow: "var(--shadow-subtle)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                       <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
                           <span style={{ background: badge.bg, color: badge.color, fontWeight: 800, fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${badge.border}` }}>
                             {badge.label}
                           </span>
-                          <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`} style={{ fontSize: 10 }}>
-                            {r.status}
-                          </span>
+                          {renderVerificationBadge(r)}
                         </div>
 
                         <h4 style={{ fontSize: 15, fontWeight: 700 }}>{r.title}</h4>
@@ -789,7 +809,18 @@ function App() {
                           <img src={r.imageUrl} alt="Incident preview" style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 6, marginTop: 10, border: "1px solid #111" }} />
                         )}
 
-                        <p style={{ fontSize: 12.5, color: "#333", marginTop: 8 }}>{r.desc}</p>
+                        <div style={{ marginTop: 10, padding: 8, background: "#F8FAFC", borderRadius: 6, fontSize: 11.5, border: "1px solid #CBD5E1" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                            <span>⚡ Local Estimated AQI:</span>
+                            <span style={{ color: (r.estimated_aqi || 200) > 300 ? "#B91C1C" : "#C2410C" }}>{r.estimated_aqi || (100 + score * 28)} AQI</span>
+                          </div>
+                          {r.closest_station && (
+                            <div style={{ color: "#475569", fontSize: 10.5, marginTop: 3 }}>
+                              📡 <strong>Closest Station:</strong> {r.closest_station.name} ({r.closest_station.distance_km} km)<br/>
+                              Station AQI: <strong>{r.closest_station.station_aqi}</strong> (Delta: <strong style={{ color: r.closest_station.delta.startsWith('+') ? '#B91C1C' : '#15803D' }}>{r.closest_station.delta}</strong>)
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <button 
@@ -1116,23 +1147,36 @@ function App() {
                       <div key={r.id} className="report-card">
                         <div className="report-header" style={{ flexWrap: "wrap", gap: 8 }}>
                           <strong style={{ fontSize: 16 }}>{r.title}</strong>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                             <span style={{ background: badge.bg, color: badge.color, fontWeight: 800, fontSize: 11, padding: "2px 8px", borderRadius: 4, border: `1px solid ${badge.border}` }}>
                               {badge.label}
                             </span>
-                            <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
-                              {r.status}
-                            </span>
+                            {renderVerificationBadge(r)}
                           </div>
                         </div>
                         {r.imageUrl && (
                           <img src={r.imageUrl} alt="Proof" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 6, marginTop: 10, border: "1px solid #E5E5E5" }} />
                         )}
+
+                        <div style={{ marginTop: 10, padding: 10, background: "#F8FAFC", borderRadius: 6, fontSize: 12, border: "1px solid #CBD5E1" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                            <span>⚡ <strong>Local Image Estimated AQI:</strong></span>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: (r.estimated_aqi || 200) > 300 ? "#B91C1C" : "#C2410C" }}>
+                              {r.estimated_aqi || (100 + score * 28)} AQI
+                            </span>
+                          </div>
+                          {r.closest_station && (
+                            <div style={{ color: "#475569", fontSize: 11, marginTop: 4 }}>
+                              📡 <strong>Closest Real Station:</strong> {r.closest_station.name} ({r.closest_station.distance_km} km away)<br/>
+                              Station AQI: <strong>{r.closest_station.station_aqi}</strong> | Delta vs Station: <strong style={{ color: r.closest_station.delta.startsWith('+') ? '#B91C1C' : '#15803D' }}>{r.closest_station.delta} AQI</strong>
+                            </div>
+                          )}
+                        </div>
+
                         {r.analysis && (
-                          <div style={{ marginTop: 10, padding: 10, background: "#F4F4F5", borderRadius: 6, fontSize: 12, border: "1px solid #E4E4E7" }}>
-                            <div><strong>Gemini AI Analysis:</strong></div>
-                            <div>Type: {r.analysis.pollution_type} | Severity Score: <strong>{r.analysis.severity}/10</strong></div>
-                            <div>Confidence: {(r.analysis.confidence * 100).toFixed(0)}% | Spam Flagged: {r.analysis.is_spam ? "Yes ⚠️" : "No ✅"}</div>
+                          <div style={{ marginTop: 8, padding: 8, background: "#F4F4F5", borderRadius: 6, fontSize: 11.5, border: "1px solid #E4E4E7" }}>
+                            <div><strong>Gemini AI Analysis:</strong> Type: {r.analysis.pollution_type} | Severity Score: <strong>{r.analysis.severity}/10</strong></div>
+                            <div>Confidence: {(r.analysis.confidence * 100).toFixed(0)}% | Citizens Reported: <strong>{r.report_count || 1}</strong></div>
                           </div>
                         )}
                         <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 8 }}>{r.desc}</p>
@@ -1346,10 +1390,10 @@ function App() {
               <thead>
                 <tr>
                   <th>Priority Level</th>
-                  <th>Title & Location</th>
-                  <th>Category</th>
-                  <th>Coordinates</th>
-                  <th>Status</th>
+                  <th>Title & Estimated AQI</th>
+                  <th>Nearest CPCB Station & Delta</th>
+                  <th>Reports & Coordinates</th>
+                  <th>Verification Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -1373,18 +1417,28 @@ function App() {
                         </td>
                         <td>
                           <strong>{r.title}</strong>
-                          <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{r.locationName}</div>
+                          <div style={{ fontSize: 11.5, color: "#C2410C", fontWeight: 700 }}>
+                            ⚡ Estimated: {r.estimated_aqi || (100 + score * 28)} AQI
+                          </div>
                         </td>
-                        <td>{r.type}</td>
-                        <td style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{r.lat}, {r.lng}</td>
+                        <td style={{ fontSize: 11.5 }}>
+                          {r.closest_station ? (
+                            <div>
+                              <div>📡 {r.closest_station.name} ({r.closest_station.distance_km} km)</div>
+                              <div>Station AQI: <strong>{r.closest_station.station_aqi}</strong> (Delta: <strong style={{ color: r.closest_station.delta.startsWith('+') ? '#B91C1C' : '#15803D' }}>{r.closest_station.delta}</strong>)</div>
+                            </div>
+                          ) : "N/A"}
+                        </td>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: 11.5 }}>
+                          <div>📍 {r.lat}, {r.lng}</div>
+                          <div>👥 <strong>{r.report_count || 1} citizens reported</strong></div>
+                        </td>
                         <td>
-                          <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
-                            {r.status}
-                          </span>
+                          {renderVerificationBadge(r)}
                         </td>
                         <td>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {r.status === "PENDING REVIEW" && (
+                            {r.status !== "ADMIN VERIFIED" && r.status !== "REJECTED" && (
                               <React.Fragment>
                                 <button className="btn-brutal btn-green" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => handleVerify(r.id)}>Verify</button>
                                 <button className="btn-brutal" style={{ padding: "4px 8px", fontSize: 11, background: "#FEE2E2" }} onClick={() => handleReject(r.id)}>Reject</button>

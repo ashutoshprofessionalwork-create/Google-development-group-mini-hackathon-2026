@@ -1,4 +1,5 @@
 import os
+import math
 from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +9,38 @@ from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 from db import init_db, get_db
 from gemini_client import analyze_pollution_image
+
+OFFICIAL_STATIONS = [
+    {"name": "Chhoti Gwaltoli CPCB Central Station", "lat": 22.7196, "lng": 75.8577, "aqi": 188},
+    {"name": "Vijay Nagar MPPCB Station", "lat": 22.7533, "lng": 75.8937, "aqi": 195},
+    {"name": "Pithampur Industrial Station", "lat": 22.6148, "lng": 75.6811, "aqi": 245},
+    {"name": "Sanwer Road Industrial Station", "lat": 22.7712, "lng": 75.9012, "aqi": 210},
+    {"name": "IIT Indore Simrol Baseline Station", "lat": 22.5204, "lng": 75.9207, "aqi": 92}
+]
+
+
+def find_closest_station(lat: float, lon: float):
+    best_station = None
+    min_dist = float("inf")
+    
+    for st in OFFICIAL_STATIONS:
+        dlat = math.radians(st["lat"] - lat)
+        dlon = math.radians(st["lng"] - lon)
+        a = (math.sin(dlat / 2) ** 2 + 
+             math.cos(math.radians(lat)) * math.cos(math.radians(st["lat"])) * 
+             math.sin(dlon / 2) ** 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        dist_km = 6371.0 * c
+        
+        if dist_km < min_dist:
+            min_dist = dist_km
+            best_station = st
+            
+    return {
+        "name": best_station["name"],
+        "station_aqi": best_station["aqi"],
+        "distance_km": round(min_dist, 1)
+    }
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -68,20 +101,51 @@ def get_reports(sort_by_severity: bool = True):
     rows = cursor.fetchall()
     reports = []
     for row in rows:
+        lat = row["lat"] if row["lat"] else 22.7196
+        lon = row["lon"] if row["lon"] else 75.8577
+        est_aqi = row["estimated_aqi"] if ("estimated_aqi" in row.keys() and row["estimated_aqi"]) else (100 + (row["severity"] or 5) * 28)
+        rep_count = row["report_count"] if ("report_count" in row.keys() and row["report_count"]) else 1
+        raw_status = row["status"] if "status" in row.keys() else "PENDING REVIEW"
+        
+        # Closest station comparison
+        closest = find_closest_station(lat, lon)
+        aqi_delta = est_aqi - closest["station_aqi"]
+        
+        # Verification badge determination rule:
+        # 1. Rejected/Spam -> REJECTED
+        # 2. Admin verified manually OR >= 50 people reported -> ADMIN VERIFIED
+        # 3. < 50 people reported -> AI VERIFIED
+        if row["is_spam"] or raw_status == "REJECTED" or raw_status == "REJECTED (SPAM)":
+            badge_status = "REJECTED"
+        elif raw_status == "ADMIN VERIFIED" or rep_count >= 50:
+            badge_status = "ADMIN VERIFIED"
+        else:
+            badge_status = "AI VERIFIED"
+
         reports.append({
             "id": row["id"],
             "title": f"{row['pollution_type'] or 'Pollution'} Report (Severity {row['severity']}/10)",
             "type": row["pollution_type"] or "General Emission",
             "desc": f"Confidence: {int((row['confidence'] or 0.8) * 100)}%. Spam: {'Yes' if row['is_spam'] else 'No'}",
-            "lat": row["lat"],
-            "lng": row["lon"],
+            "lat": lat,
+            "lng": lon,
             "locationName": "Indore Sector",
-            "status": "REJECTED (SPAM)" if row["is_spam"] else row["status"] if "status" in row.keys() else "PENDING REVIEW",
+            "status": badge_status,
+            "raw_status": raw_status,
+            "estimated_aqi": est_aqi,
+            "report_count": rep_count,
+            "closest_station": {
+                "name": closest["name"],
+                "station_aqi": closest["station_aqi"],
+                "distance_km": closest["distance_km"],
+                "delta": f"+{aqi_delta}" if aqi_delta > 0 else f"{aqi_delta}"
+            },
             "timestamp": "Recent",
             "imageUrl": row["image_url"],
             "analysis": {
                 "pollution_type": row["pollution_type"],
                 "severity": row["severity"],
+                "estimated_aqi": est_aqi,
                 "confidence": row["confidence"],
                 "is_spam": bool(row["is_spam"])
             }
@@ -156,17 +220,22 @@ async def create_report(
     except Exception:
         image_url = f"https://storage.googleapis.com/vayunetra-mock/{file.filename}"
 
-    # 4. Insert into SQLite
+    # 4. Extract estimated_aqi from analysis or calculate
+    est_aqi = getattr(analysis, "estimated_aqi", 100 + (analysis.severity or 5) * 28)
+
+    # 5. Insert into SQLite
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO reports (pollution_type, severity, confidence, lat, lon, image_url, is_spam, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO reports (pollution_type, severity, estimated_aqi, report_count, confidence, lat, lon, image_url, is_spam, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             analysis.pollution_type,
             analysis.severity,
+            est_aqi,
+            1, # Initial report count = 1 (< 50 -> AI VERIFIED badge)
             analysis.confidence,
             lat,
             lon,

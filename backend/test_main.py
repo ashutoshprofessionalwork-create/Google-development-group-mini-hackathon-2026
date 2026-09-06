@@ -24,6 +24,7 @@ class TestVayuNetraAPI(unittest.TestCase):
         mock_analyze.return_value = PollutionReport(
             pollution_type="Smoke",
             severity=7,
+            estimated_aqi=280,
             confidence=0.85,
             is_spam=False
         )
@@ -73,7 +74,7 @@ class TestVayuNetraAPI(unittest.TestCase):
     @patch("gemini_client.client")
     def test_analyze_pollution_image_uses_supported_model(self, mock_genai_client):
         mock_response = MagicMock()
-        mock_response.text = '{"pollution_type": "Smoke", "severity": 5, "confidence": 0.9, "is_spam": false}'
+        mock_response.text = '{"pollution_type": "Smoke", "severity": 5, "estimated_aqi": 210, "confidence": 0.9, "is_spam": false}'
         mock_genai_client.models.generate_content.return_value = mock_response
 
         report = analyze_pollution_image(b"test_image", "image/jpeg")
