@@ -120,6 +120,7 @@ const { useState, useEffect, useRef } = React;
 function App() {
   const [reports, setReports] = useState([]);
   const [zones, setZones] = useState([]);
+  const [forecast, setForecast] = useState([]);
   const [liveMetrics, setLiveMetrics] = useState({
     aqi: null,
     status: null,
@@ -129,8 +130,11 @@ function App() {
     no2: null
   });
 
+  const [authorityAlert, setAuthorityAlert] = useState(null);
+  const [sortBySeverity, setSortBySeverity] = useState(true);
+
   const [isAdmin, setIsAdmin] = useState(false);
-  const [view, setView] = useState("public"); // 'public', 'user-login', 'admin-login', 'admin'
+  const [view, setView] = useState("home"); // 'home', 'public', 'user-login', 'admin-login', 'admin'
   
   // Citizen Registered User State (Ready for SQL)
   const [currentUser, setCurrentUser] = useState(null);
@@ -168,6 +172,41 @@ function App() {
   const streamRef = useRef(null);
   const [locLoading, setLocLoading] = useState(false);
 
+  /* ==================== FETCH BACKEND DATA ==================== */
+  const fetchBackendData = async () => {
+    try {
+      const [mRes, zRes, rRes, fRes] = await Promise.allSettled([
+        fetch("http://localhost:8000/metrics"),
+        fetch("http://localhost:8000/zones"),
+        fetch("http://localhost:8000/reports"),
+        fetch("http://localhost:8000/forecast")
+      ]);
+
+      if (mRes.status === "fulfilled" && mRes.value.ok) {
+        const mData = await mRes.value.json();
+        setLiveMetrics(mData);
+      }
+      if (zRes.status === "fulfilled" && zRes.value.ok) {
+        const zData = await zRes.value.json();
+        setZones(zData);
+      }
+      if (rRes.status === "fulfilled" && rRes.value.ok) {
+        const rData = await rRes.value.json();
+        setReports(rData);
+      }
+      if (fRes.status === "fulfilled" && fRes.value.ok) {
+        const fData = await fRes.value.json();
+        setForecast(fData.forecast_24h || []);
+      }
+    } catch (err) {
+      console.warn("Backend server not running or network issue:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackendData();
+  }, []);
+
   /* ==================== HIDDEN /admin ROUTE LISTENER ==================== */
   const checkRoute = () => {
     const path = window.location.pathname;
@@ -197,6 +236,25 @@ function App() {
     setView(newView);
     window.history.pushState({}, "", url);
   };
+
+  const getSeverityScore = (r) => {
+    if (r.analysis && typeof r.analysis.severity === "number") return r.analysis.severity;
+    if (typeof r.severity === "number") return r.severity;
+    return 5;
+  };
+
+  const getSeverityBadge = (score) => {
+    if (score >= 8) return { label: `🚨 CRITICAL (Sev ${score}/10)`, color: "#B91C1C", bg: "#FEE2E2", border: "#EF4444" };
+    if (score >= 5) return { label: `⚡ HIGH PRIORITY (Sev ${score}/10)`, color: "#C2410C", bg: "#FFEDD5", border: "#F97316" };
+    return { label: `📌 MODERATE (Sev ${score}/10)`, color: "#854D0E", bg: "#FEF08A", border: "#EAB308" };
+  };
+
+  const sortedReports = [...reports].sort((a, b) => {
+    if (sortBySeverity) {
+      return getSeverityScore(b) - getSeverityScore(a);
+    }
+    return (b.id || 0) - (a.id || 0);
+  });
 
   /* ==================== BULLETPROOF CITIZEN GPS AUTO-FILL ==================== */
   const handleUserGpsAutoFill = () => {
@@ -317,12 +375,30 @@ function App() {
     navigateTo("public", "/");
   };
 
-  const handleVerify = (id) => {
+  const handleVerify = async (id) => {
     setReports(prev => prev.map(r => r.id === id ? { ...r, status: "ADMIN VERIFIED" } : r));
+    try {
+      await fetch(`http://localhost:8000/reports/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "ADMIN VERIFIED" })
+      });
+    } catch (err) {
+      console.warn("Could not patch report status:", err);
+    }
   };
 
-  const handleReject = (id) => {
+  const handleReject = async (id) => {
     setReports(prev => prev.map(r => r.id === id ? { ...r, status: "REJECTED" } : r));
+    try {
+      await fetch(`http://localhost:8000/reports/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "REJECTED" })
+      });
+    } catch (err) {
+      console.warn("Could not patch report status:", err);
+    }
   };
 
   /* ==================== CAMERA LOGIC ==================== */
@@ -562,14 +638,20 @@ function App() {
 
         {/* TOPBAR ACTIONS */}
         <div className="topbar-actions">
-          {isAdmin && (
+          <button 
+            className={`btn-brutal ${view === "home" ? "btn-yellow" : ""}`} 
+            onClick={() => navigateTo("home", "/")}
+          >
+            🏠 Home
+          </button>
+          <button 
+            className={`btn-brutal ${view === "public" ? "btn-yellow" : ""}`} 
+            onClick={() => navigateTo("public", "/")}
+          >
+            🗺️ Live Map & Report
+          </button>
+          {isAdmin ? (
             <React.Fragment>
-              <button 
-                className={`btn-brutal ${view === "public" ? "btn-yellow" : ""}`} 
-                onClick={() => navigateTo("public", "/")}
-              >
-                Public Portal
-              </button>
               <button 
                 className={`btn-brutal ${view === "admin" ? "btn-yellow" : ""}`} 
                 onClick={() => navigateTo("admin", "/admin")}
@@ -583,9 +665,183 @@ function App() {
                 Exit Admin
               </button>
             </React.Fragment>
+          ) : (
+            <button 
+              className="btn-brutal" 
+              onClick={() => navigateTo("admin-login", "/admin")}
+              style={{ fontSize: 12, opacity: 0.8 }}
+            >
+              🔐 Admin Portal
+            </button>
           )}
         </div>
       </header>
+
+      {/* ================= 0. FULL FEATURED HOME SCREEN VIEW ================= */}
+      {view === "home" && (
+        <div style={{ marginTop: 20 }}>
+          {/* HERO BANNER */}
+          <div style={{ border: "var(--border-thick)", background: "#FFF", boxShadow: "var(--shadow-hard)", borderRadius: 8, padding: 32 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
+              <div style={{ maxWidth: 700 }}>
+                <span style={{ background: "var(--brand-yellow)", padding: "4px 10px", borderRadius: 4, fontWeight: 800, fontSize: 12, border: "1px solid #111" }}>
+                  🌫️ GDG INDORE - BUILD WITH AI 2026
+                </span>
+                <h2 style={{ fontFamily: "var(--font-head)", fontSize: 32, textTransform: "uppercase", marginTop: 12, lineHeight: 1.15 }}>
+                  VayuNetra — AI-Powered Real-Time Air Quality Surveillance
+                </h2>
+                <p style={{ fontSize: 15, color: "var(--ink-muted)", marginTop: 10, lineHeight: 1.5 }}>
+                  Fusing citizen photo reports, Gemini 2.5 AI multimodal vision, and sensor networks to verify pollution hotspots, order critical incidents by severity, and route evidence directly to municipal authorities.
+                </p>
+                <div style={{ display: "flex", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
+                  <button className="btn-brutal btn-yellow" style={{ padding: "12px 20px", fontSize: 14 }} onClick={() => navigateTo("public", "/")}>
+                    📸 Snap & Report Pollution
+                  </button>
+                  <button className="btn-brutal" style={{ padding: "12px 20px", fontSize: 14 }} onClick={() => navigateTo("public", "/")}>
+                    🗺️ Open Hotspot Map
+                  </button>
+                  {!currentUser && (
+                    <button className="btn-brutal" style={{ padding: "12px 20px", fontSize: 14, background: "#EFF6FF" }} onClick={() => navigateTo("user-login", "/")}>
+                      👤 Citizen Profile
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* LIVE AQI SUMMARY WIDGET */}
+              <div style={{ border: "var(--border-thick)", borderRadius: 8, padding: 20, background: "#FAFAFA", minWidth: 260, textAlign: "center", boxShadow: "var(--shadow-subtle)" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "var(--ink-muted)" }}>Current Corridor AQI</div>
+                <div style={{ fontSize: 64, fontWeight: 800, fontFamily: "var(--font-head)", color: "var(--brand-orange)", lineHeight: 1.1 }}>
+                  {liveMetrics.aqi ?? 184}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, background: "#FFEDD5", color: "#C2410C", padding: "4px 8px", borderRadius: 4, marginTop: 6, display: "inline-block" }}>
+                  {liveMetrics.status ?? "Unhealthy for Sensitive Groups"}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14, fontSize: 12, fontFamily: "var(--font-mono)" }}>
+                  <div style={{ background: "#FFF", border: "1px solid #111", padding: 6, borderRadius: 4 }}>
+                    <div>PM2.5</div>
+                    <strong>{liveMetrics.pm25 ?? 88.5} µg</strong>
+                  </div>
+                  <div style={{ background: "#FFF", border: "1px solid #111", padding: 6, borderRadius: 4 }}>
+                    <div>PM10</div>
+                    <strong>{liveMetrics.pm10 ?? 142} µg</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PRIORITY SEVERITY BOARD SECTION */}
+          <div className="panel" style={{ marginTop: 28 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <h3 style={{ fontSize: 18, textTransform: "uppercase" }}>🔥 High-Priority Pollution Incidents</h3>
+                <p style={{ fontSize: 13, color: "var(--ink-muted)" }}>
+                  Incidents automatically ranked by Gemini AI Severity Level (Score 10 to 1). Critical violations listed first.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button 
+                  className={`btn-brutal ${sortBySeverity ? "btn-yellow" : ""}`} 
+                  style={{ fontSize: 12, padding: "6px 12px" }}
+                  onClick={() => setSortBySeverity(true)}
+                >
+                  ⚡ Sort by Severity (Priority)
+                </button>
+                <button 
+                  className={`btn-brutal ${!sortBySeverity ? "btn-yellow" : ""}`} 
+                  style={{ fontSize: 12, padding: "6px 12px" }}
+                  onClick={() => setSortBySeverity(false)}
+                >
+                  🕒 Sort by Recent
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16, marginTop: 18 }}>
+              {sortedReports.length === 0 ? (
+                <div className="empty-state" style={{ gridColumn: "1 / -1" }}>
+                  No reports logged yet. Use 'Snap & Report' to submit photo evidence.
+                </div>
+              ) : (
+                sortedReports.slice(0, 6).map((r) => {
+                  const score = getSeverityScore(r);
+                  const badge = getSeverityBadge(score);
+                  return (
+                    <div key={r.id} style={{ border: `2px solid ${badge.border}`, borderRadius: 8, padding: 16, background: "#FFF", boxShadow: "var(--shadow-subtle)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <span style={{ background: badge.bg, color: badge.color, fontWeight: 800, fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${badge.border}` }}>
+                            {badge.label}
+                          </span>
+                          <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`} style={{ fontSize: 10 }}>
+                            {r.status}
+                          </span>
+                        </div>
+
+                        <h4 style={{ fontSize: 15, fontWeight: 700 }}>{r.title}</h4>
+                        <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 4 }}>
+                          📍 {r.locationName} ({r.lat}, {r.lng})
+                        </div>
+
+                        {r.imageUrl && (
+                          <img src={r.imageUrl} alt="Incident preview" style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 6, marginTop: 10, border: "1px solid #111" }} />
+                        )}
+
+                        <p style={{ fontSize: 12.5, color: "#333", marginTop: 8 }}>{r.desc}</p>
+                      </div>
+
+                      <button 
+                        className="btn-brutal btn-yellow" 
+                        style={{ marginTop: 14, width: "100%", justifyContent: "center", padding: "8px 12px", fontSize: 12 }}
+                        onClick={() => setAuthorityAlert(r)}
+                      >
+                        🚨 Dispatch Authority Alert
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* KEY FEATURES GRID */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginTop: 28 }}>
+            <div className="panel" style={{ padding: 20 }}>
+              <div style={{ fontSize: 28 }}>🤖</div>
+              <h4 style={{ fontSize: 16, textTransform: "uppercase", marginTop: 8 }}>Gemini Multimodal AI</h4>
+              <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 6 }}>
+                Classifies pollution category (Smoke, Dust, Garbage), scores severity 1-10, and filters fake/spam photos instantly.
+              </p>
+            </div>
+
+            <div className="panel" style={{ padding: 20 }}>
+              <div style={{ fontSize: 28 }}>📍</div>
+              <h4 style={{ fontSize: 16, textTransform: "uppercase", marginTop: 8 }}>Live Hotspot Map</h4>
+              <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 6 }}>
+                Pins coordinates, renders density circles over Indore corridors, and allows direct click-to-pin report location.
+              </p>
+            </div>
+
+            <div className="panel" style={{ padding: 20 }}>
+              <div style={{ fontSize: 28 }}>📈</div>
+              <h4 style={{ fontSize: 16, textTransform: "uppercase", marginTop: 8 }}>24h AQI Forecasting</h4>
+              <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 6 }}>
+                Diurnal extrapolation model predicting hourly air quality shifts across peak industrial and vehicular hours.
+              </p>
+            </div>
+
+            <div className="panel" style={{ padding: 20 }}>
+              <div style={{ fontSize: 28 }}>🚨</div>
+              <h4 style={{ fontSize: 16, textTransform: "uppercase", marginTop: 8 }}>Authority Dispatch</h4>
+              <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 6 }}>
+                Generates geolocated evidence cards for immediate routing to MP Pollution Control Board & Municipal Corp.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= 1. CITIZEN REGISTRATION / LOGIN VIEW ================= */}
       {view === "user-login" && (
@@ -830,70 +1086,139 @@ function App() {
 
               {/* RECENT REPORTS */}
               <div style={{ marginTop: 24 }}>
-                <h3 style={{ fontSize: 15, textTransform: "uppercase", letterSpacing: "0.05em" }}>Recent Community Reports</h3>
-                {reports.length === 0 ? (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 15, textTransform: "uppercase", letterSpacing: "0.05em" }}>Citizen Reports Feed</h3>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button 
+                      className={`btn-brutal ${sortBySeverity ? "btn-yellow" : ""}`} 
+                      style={{ fontSize: 11, padding: "4px 8px" }}
+                      onClick={() => setSortBySeverity(true)}
+                    >
+                      ⚡ Priority (Severity)
+                    </button>
+                    <button 
+                      className={`btn-brutal ${!sortBySeverity ? "btn-yellow" : ""}`} 
+                      style={{ fontSize: 11, padding: "4px 8px" }}
+                      onClick={() => setSortBySeverity(false)}
+                    >
+                      🕒 Recent
+                    </button>
+                  </div>
+                </div>
+
+                {sortedReports.length === 0 ? (
                   <div className="empty-state">No citizen reports submitted yet.</div>
                 ) : (
-                  reports.map((r) => (
-                    <div key={r.id} className="report-card">
-                      <div className="report-header">
-                        <strong style={{ fontSize: 16 }}>{r.title}</strong>
-                        <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
-                          {r.status}
-                        </span>
-                      </div>
-                      {r.imageUrl && (
-                        <img src={r.imageUrl} alt="Proof" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 6, marginTop: 10, border: "1px solid #E5E5E5" }} />
-                      )}
-                      {r.analysis && (
-                        <div style={{ marginTop: 10, padding: 10, background: "#F4F4F5", borderRadius: 6, fontSize: 12, border: "1px solid #E4E4E7" }}>
-                          <div><strong>Gemini AI Analysis:</strong></div>
-                          <div>Type: {r.analysis.pollution_type} | Severity: {r.analysis.severity}/10</div>
-                          <div>Confidence: {(r.analysis.confidence * 100).toFixed(0)}% | Spam Flagged: {r.analysis.is_spam ? "Yes ⚠️" : "No ✅"}</div>
+                  sortedReports.map((r) => {
+                    const score = getSeverityScore(r);
+                    const badge = getSeverityBadge(score);
+                    return (
+                      <div key={r.id} className="report-card">
+                        <div className="report-header" style={{ flexWrap: "wrap", gap: 8 }}>
+                          <strong style={{ fontSize: 16 }}>{r.title}</strong>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <span style={{ background: badge.bg, color: badge.color, fontWeight: 800, fontSize: 11, padding: "2px 8px", borderRadius: 4, border: `1px solid ${badge.border}` }}>
+                              {badge.label}
+                            </span>
+                            <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
+                              {r.status}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 8 }}>{r.desc}</p>
-                      <div className="coords-time">
-                        <span>📍 {r.lat}, {r.lng} ({r.locationName})</span>
-                        <span>🕒 {r.timestamp}</span>
-                        {r.submittedBy && <span>👤 {r.submittedBy}</span>}
+                        {r.imageUrl && (
+                          <img src={r.imageUrl} alt="Proof" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 6, marginTop: 10, border: "1px solid #E5E5E5" }} />
+                        )}
+                        {r.analysis && (
+                          <div style={{ marginTop: 10, padding: 10, background: "#F4F4F5", borderRadius: 6, fontSize: 12, border: "1px solid #E4E4E7" }}>
+                            <div><strong>Gemini AI Analysis:</strong></div>
+                            <div>Type: {r.analysis.pollution_type} | Severity Score: <strong>{r.analysis.severity}/10</strong></div>
+                            <div>Confidence: {(r.analysis.confidence * 100).toFixed(0)}% | Spam Flagged: {r.analysis.is_spam ? "Yes ⚠️" : "No ✅"}</div>
+                          </div>
+                        )}
+                        <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 8 }}>{r.desc}</p>
+                        <div className="coords-time">
+                          <span>📍 {r.lat}, {r.lng} ({r.locationName})</span>
+                          <span>🕒 {r.timestamp}</span>
+                          {r.submittedBy && <span>👤 {r.submittedBy}</span>}
+                        </div>
+                        <div style={{ marginTop: 12 }}>
+                          <button 
+                            className="btn-brutal btn-yellow" 
+                            style={{ padding: "6px 12px", fontSize: 12 }}
+                            onClick={() => setAuthorityAlert(r)}
+                          >
+                            🚨 Dispatch Authority Alert
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
 
-            {/* MAP */}
-            <div className="panel" style={{ height: "fit-content" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>Indore Surveillance Map</h3>
-                <span style={{ fontSize: 11, background: "#FEF08A", padding: "3px 8px", borderRadius: 4, fontWeight: 700 }}>
-                  💡 Click map to pick location
-                </span>
-              </div>
-              <p style={{ fontSize: 12.5, color: "var(--ink-muted)", marginTop: 2 }}>
-                Click anywhere on the map to automatically pin coordinates into the report form.
-              </p>
-              
-              <LeafletMapContainer 
-                zones={zones} 
-                selectedCoords={lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null}
-                onSelectLocation={handleMapLocationSelect} 
-              />
+            {/* MAP & FORECAST */}
+            <div>
+              <div className="panel" style={{ height: "fit-content" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>Indore Surveillance Map</h3>
+                  <span style={{ fontSize: 11, background: "#FEF08A", padding: "3px 8px", borderRadius: 4, fontWeight: 700 }}>
+                    💡 Click map to pick location
+                  </span>
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--ink-muted)", marginTop: 2 }}>
+                  Click anywhere on the map to automatically pin coordinates into the report form.
+                </p>
+                
+                <LeafletMapContainer 
+                  zones={zones} 
+                  selectedCoords={lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null}
+                  onSelectLocation={handleMapLocationSelect} 
+                />
 
-              <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 12, fontWeight: 700 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-green)" }}></span>
-                  &lt; 5 Complaints (Low)
+                <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 12, fontWeight: 700 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-green)" }}></span>
+                    &lt; 5 Complaints (Low)
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-orange)" }}></span>
+                    10+ Complaints (Moderate)
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-red)" }}></span>
+                    50+ Complaints (Critical)
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-orange)" }}></span>
-                  10+ Complaints (Moderate)
+              </div>
+
+              {/* 24-HOUR AQI FORECAST */}
+              <div className="panel" style={{ marginTop: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>📈 24-Hour AQI Trend Forecast</h3>
+                  <span style={{ fontSize: 11, background: "#DCFCE7", color: "#15803D", padding: "3px 8px", borderRadius: 4, fontWeight: 700 }}>
+                    Linear Extrapolation Model
+                  </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-red)" }}></span>
-                  50+ Complaints (Critical)
+                <p style={{ fontSize: 12.5, color: "var(--ink-muted)", marginTop: 2 }}>
+                  Projected air quality trends for the next 24 hours based on diurnal corridor patterns.
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginTop: 16, overflowX: "auto" }}>
+                  {(forecast.length > 0 ? forecast.slice(0, 12) : [
+                    { hour: "+2h", aqi: 192, category: "Moderate" },
+                    { hour: "+4h", aqi: 205, category: "Poor" },
+                    { hour: "+6h", aqi: 218, category: "Poor" },
+                    { hour: "+8h", aqi: 210, category: "Poor" },
+                    { hour: "+10h", aqi: 185, category: "Moderate" },
+                    { hour: "+12h", aqi: 172, category: "Moderate" },
+                  ]).map((item, idx) => (
+                    <div key={idx} style={{ border: "var(--border-thick)", borderRadius: 6, padding: "8px 4px", textAlign: "center", background: item.aqi > 200 ? "#FEE2E2" : "#FEF9C3" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{item.hour}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-head)" }}>{item.aqi}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: item.aqi > 200 ? "#991B1B" : "#854D0E" }}>{item.category}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -997,10 +1322,30 @@ function App() {
           </div>
 
           <div className="panel" style={{ marginTop: 24 }}>
-            <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>Incoming Citizen Reports Moderation</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>Incoming Citizen Reports Moderation Queue</h3>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button 
+                  className={`btn-brutal ${sortBySeverity ? "btn-yellow" : ""}`} 
+                  style={{ fontSize: 11, padding: "4px 8px" }}
+                  onClick={() => setSortBySeverity(true)}
+                >
+                  ⚡ Priority Order (Severity 10 -> 1)
+                </button>
+                <button 
+                  className={`btn-brutal ${!sortBySeverity ? "btn-yellow" : ""}`} 
+                  style={{ fontSize: 11, padding: "4px 8px" }}
+                  onClick={() => setSortBySeverity(false)}
+                >
+                  🕒 Order by Time
+                </button>
+              </div>
+            </div>
+
             <table className="triage-table">
               <thead>
                 <tr>
+                  <th>Priority Level</th>
                   <th>Title & Location</th>
                   <th>Category</th>
                   <th>Coordinates</th>
@@ -1009,36 +1354,48 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {reports.length === 0 ? (
+                {sortedReports.length === 0 ? (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: "center", color: "var(--ink-muted)", padding: "24px" }}>
+                    <td colSpan="6" style={{ textAlign: "center", color: "var(--ink-muted)", padding: "24px" }}>
                       No reports currently in queue.
                     </td>
                   </tr>
                 ) : (
-                  reports.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <strong>{r.title}</strong>
-                        <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{r.locationName}</div>
-                      </td>
-                      <td>{r.type}</td>
-                      <td style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{r.lat}, {r.lng}</td>
-                      <td>
-                        <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
-                          {r.status}
-                        </span>
-                      </td>
-                      <td>
-                        {r.status === "PENDING REVIEW" && (
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button className="btn-brutal btn-green" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => handleVerify(r.id)}>Verify</button>
-                            <button className="btn-brutal" style={{ padding: "4px 8px", fontSize: 11, background: "#FEE2E2" }} onClick={() => handleReject(r.id)}>Reject</button>
+                  sortedReports.map((r) => {
+                    const score = getSeverityScore(r);
+                    const badge = getSeverityBadge(score);
+                    return (
+                      <tr key={r.id}>
+                        <td>
+                          <span style={{ background: badge.bg, color: badge.color, fontWeight: 800, fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${badge.border}` }}>
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td>
+                          <strong>{r.title}</strong>
+                          <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{r.locationName}</div>
+                        </td>
+                        <td>{r.type}</td>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{r.lat}, {r.lng}</td>
+                        <td>
+                          <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {r.status === "PENDING REVIEW" && (
+                              <React.Fragment>
+                                <button className="btn-brutal btn-green" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => handleVerify(r.id)}>Verify</button>
+                                <button className="btn-brutal" style={{ padding: "4px 8px", fontSize: 11, background: "#FEE2E2" }} onClick={() => handleReject(r.id)}>Reject</button>
+                              </React.Fragment>
+                            )}
+                            <button className="btn-brutal btn-yellow" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => setAuthorityAlert(r)}>🚨 Dispatch Alert</button>
                           </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1079,6 +1436,47 @@ function App() {
                 📸 Capture Photo
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AUTHORITY DISPATCH MOCK SCREEN MODAL */}
+      {authorityAlert && (
+        <div className="modal-overlay" onClick={() => setAuthorityAlert(null)}>
+          <div className="modal-box" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <span style={{ fontSize: 28 }}>🚨</span>
+              <div>
+                <h3 style={{ textTransform: "uppercase", fontSize: 18 }}>Municipal Emergency Dispatch</h3>
+                <span style={{ fontSize: 11, color: "var(--ink-muted)", fontFamily: "var(--font-mono)" }}>
+                  REF ID: #ALERT-{authorityAlert.id || Date.now()}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ border: "var(--border-thick)", background: "#FEF08A", padding: 14, borderRadius: 6, fontSize: 13, marginBottom: 14 }}>
+              <strong>Status:</strong> DISPATCHED TO MP Pollution Control Board & Indore Municipal Corp.
+            </div>
+
+            <div style={{ fontSize: 13, background: "#FAFAFA", border: "1px solid #E5E5E5", padding: 12, borderRadius: 6, marginBottom: 14 }}>
+              <div><b>Pollution Target:</b> {authorityAlert.title}</div>
+              <div><b>Classification:</b> {authorityAlert.type}</div>
+              <div><b>GPS Coordinates:</b> {authorityAlert.lat}, {authorityAlert.lng}</div>
+              <div><b>Reported By:</b> {authorityAlert.submittedBy || "Citizen Reporter"}</div>
+            </div>
+
+            <div style={{ background: "#DCFCE7", color: "#15803D", padding: 10, borderRadius: 6, fontSize: 12, fontWeight: 700, textAlign: "center", marginBottom: 16 }}>
+              ✓ Photo evidence and geotag transmitted successfully.
+            </div>
+
+            <button 
+              type="button" 
+              className="btn-brutal btn-yellow" 
+              style={{ width: "100%" }} 
+              onClick={() => setAuthorityAlert(null)}
+            >
+              Close Dispatch Window
+            </button>
           </div>
         </div>
       )}

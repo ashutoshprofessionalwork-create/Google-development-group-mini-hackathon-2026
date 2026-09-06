@@ -43,6 +43,33 @@ class TestVayuNetraAPI(unittest.TestCase):
         self.assertEqual(json_data["analysis"]["confidence"], 0.85)
         self.assertFalse(json_data["analysis"]["is_spam"])
 
+    def test_metrics_endpoint(self):
+        response = client.get("/metrics")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("aqi", data)
+        self.assertIn("pm25", data)
+
+    def test_zones_endpoint(self):
+        response = client.get("/zones")
+        self.assertEqual(response.status_code, 200)
+        zones = response.json()
+        self.assertIsInstance(zones, list)
+        self.assertGreater(len(zones), 0)
+
+    def test_forecast_endpoint(self):
+        response = client.get("/forecast")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("forecast_24h", data)
+        self.assertEqual(len(data["forecast_24h"]), 24)
+
+    def test_get_reports_endpoint(self):
+        response = client.get("/reports")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.json(), list)
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key_override"})
     @patch("gemini_client.client")
     def test_analyze_pollution_image_uses_supported_model(self, mock_genai_client):
         mock_response = MagicMock()
