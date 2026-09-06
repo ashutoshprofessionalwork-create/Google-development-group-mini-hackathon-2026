@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VayuNetra - Clean Air Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #F5F5F3;
+      --surface: #FFFFFF;
+      --ink: #111111;
+      --ink-muted: #555555;
+      --border-thick: 2px solid #111111;
+      --shadow-hard: 4px 4px 0px #111111;
+      --shadow-subtle: 2px 2px 0px #111111;
+      --brand-yellow: #FACC15;
+      --brand-green: #22C55E;
+      --brand-orange: #F97316;
+      --brand-red: #EF4444;
+      --brand-blue: #3B82F6;
+      --font-head: 'Space Grotesk', sans-serif;
+      --font-body: 'IBM Plex Sans', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--ink); font-family: var(--font-body); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .app { max-width: 1400px; margin: 0 auto; padding: 20px 24px 60px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #E5E5E5; padding-bottom: 16px; gap: 16px; flex-wrap: wrap; }
+    .brand-section { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+    .brand-icon { width: 44px; height: 44px; background: var(--brand-yellow); border: var(--border-thick); box-shadow: var(--shadow-subtle); display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 22px; cursor: pointer; }
+    .brand h1 { font-family: var(--font-head); font-size: 22px; text-transform: uppercase; }
+    .brand span { font-size: 13px; color: var(--ink-muted); display: block; }
+    
+    .topbar-actions { display: flex; gap: 10px; align-items: center; }
+    .btn-brutal { padding: 8px 16px; border: var(--border-thick); box-shadow: var(--shadow-subtle); font-weight: 700; font-size: 13.5px; cursor: pointer; background: #FFF; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; transition: transform 0.1s ease; font-family: var(--font-body); }
+    .btn-brutal:hover { transform: translate(-1px, -1px); }
+    .btn-brutal:active { transform: translate(2px, 2px); box-shadow: none; }
+    .btn-yellow { background: var(--brand-yellow); }
+    .btn-green { background: var(--brand-green); color: #FFF; }
+    .btn-red { background: #FEE2E2; color: #991B1B; }
+    
+    .user-badge { display: inline-flex; align-items: center; gap: 8px; border: var(--border-thick); background: #FEF08A; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 13px; }
+
+    .hero-stats-banner { border: var(--border-thick); background: #FFF; box-shadow: var(--shadow-hard); border-radius: 8px; margin-top: 24px; overflow: hidden; }
+    .banner-header { background: #18181B; color: #FFF; font-weight: 700; font-size: 13px; letter-spacing: 0.05em; padding: 8px 16px; display: flex; justify-content: space-between; }
+    .banner-grid { display: grid; grid-template-columns: 240px 1fr 1fr; padding: 20px; gap: 20px; }
+    .aqi-box { border: var(--border-thick); border-radius: 6px; padding: 16px; text-align: center; background: #FAFAFA; }
+    .aqi-box .num { font-size: 58px; font-weight: 800; font-family: var(--font-head); line-height: 1; }
+    .aqi-box .label { font-size: 12px; font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+    .gas-row { display: grid; grid-template-columns: 1fr 1fr; border: var(--border-thick); border-radius: 6px; padding: 12px 16px; margin-bottom: 8px; background: #FFF; }
+    .gas-row span:last-child { font-family: var(--font-mono); font-weight: 700; text-align: right; }
+    
+    .layout-split { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; margin-top: 24px; }
+    .panel { background: #FFF; border: var(--border-thick); box-shadow: var(--shadow-hard); border-radius: 8px; padding: 24px; }
+    #leaflet-map { height: 520px; width: 100%; border: var(--border-thick); border-radius: 6px; margin-top: 14px; }
+    
+    .form-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .form-icon-pill { width: 32px; height: 32px; background: #DCFCE7; border: var(--border-thick); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+    .drop-zone { border: 2px dashed #999; border-radius: 6px; padding: 30px 16px; text-align: center; margin-bottom: 20px; cursor: pointer; background: #FAFAFA; transition: all 0.2s ease; }
+    .drop-zone:hover, .drop-zone.dragging { border-color: #111; background: #FEF9C3; }
+    
+    .file-preview-card { display: flex; align-items: center; gap: 14px; border: var(--border-thick); border-radius: 6px; padding: 12px 14px; background: #FAFAFA; margin-bottom: 20px; }
+    .file-preview-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #111; }
+    .file-details { flex: 1; overflow: hidden; }
+    .file-details strong { display: block; font-size: 13px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+    .file-details span { font-size: 11.5px; color: var(--ink-muted); font-family: var(--font-mono); }
+
+    .input-label { display: block; font-size: 12.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; margin-top: 14px; }
+    .input-text, .input-select, .input-textarea { width: 100%; border: var(--border-thick); border-radius: 6px; padding: 11px 13px; font-size: 14px; background: #FFF; outline: none; }
+    .input-textarea { resize: vertical; min-height: 80px; }
+    .coords-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+    .submit-btn { width: 100%; margin-top: 20px; background: #111; color: #FFF; padding: 14px; font-weight: 700; border: var(--border-thick); box-shadow: var(--shadow-subtle); border-radius: 6px; cursor: pointer; }
+    .submit-btn:hover { background: #27272A; }
+    
+    .notice-box { margin-top: 16px; border: var(--border-thick); background: #FEF9C3; padding: 12px 14px; border-radius: 6px; font-size: 12.5px; display: flex; gap: 8px; }
+    .report-card { border: var(--border-thick); border-radius: 6px; padding: 18px; margin-top: 16px; background: #FFF; }
+    .report-header { display: flex; justify-content: space-between; align-items: center; }
+    .badge-status { padding: 4px 10px; border-radius: 4px; font-size: 11.5px; font-weight: 700; border: var(--border-thick); }
+    .badge-verified { background: #DCFCE7; color: #15803D; }
+    .badge-pending { background: #FEF08A; color: #854D0E; }
+    .badge-rejected { background: #FEE2E2; color: #B91C1C; }
+    .coords-time { font-size: 12px; color: var(--ink-muted); margin-top: 12px; display: flex; gap: 14px; font-family: var(--font-mono); }
+    .empty-state { border: 2px dashed #D4D4D8; border-radius: 6px; padding: 24px; text-align: center; color: var(--ink-muted); font-size: 13px; margin-top: 14px; background: #FAFAFA; }
+    
+    .dot-marker { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #111; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #FFF; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    .floating-camera-btn { position: fixed; right: 24px; bottom: 24px; z-index: 900; padding: 12px 16px; border: var(--border-thick); box-shadow: var(--shadow-hard); border-radius: 6px; background: var(--brand-yellow); font-weight: 700; cursor: pointer; }
+    
+    .centered-card-wrapper { min-height: 60vh; display: flex; align-items: center; justify-content: center; margin-top: 24px; }
+    .neo-card { width: 100%; max-width: 480px; background: #FFF; border: var(--border-thick); box-shadow: var(--shadow-hard); border-radius: 8px; padding: 30px; }
+    .admin-metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
+    @media (max-width: 800px) { .admin-metrics-row { grid-template-columns: repeat(2, 1fr); } }
+    .metric-card { border: var(--border-thick); box-shadow: var(--shadow-hard); background: #FFF; padding: 20px; border-radius: 6px; text-align: center; }
+    .metric-card .num { font-size: 42px; font-weight: 800; font-family: var(--font-head); }
+    .metric-card .label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--ink-muted); margin-top: 4px; }
+    .triage-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    .triage-table th, .triage-table td { border: 1px solid #E5E5E5; padding: 12px 14px; text-align: left; }
+    .triage-table th { background: #F4F4F5; font-size: 12px; text-transform: uppercase; border-bottom: var(--border-thick); }
+    
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+    .modal-box { background: #FFF; border: var(--border-thick); box-shadow: var(--shadow-hard); border-radius: 8px; width: 100%; max-width: 440px; padding: 26px; }
+
+    @media (max-width: 980px) { .layout-split { grid-template-columns: 1fr; } }
+    @media (max-width: 860px) { .banner-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+function App() {
+  const [reports, setReports] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [liveMetrics, setLiveMetrics] = useState({
+    aqi: null,
+    status: null,
+    pm25: null,
+    pm10: null,
+    so2: null,
+    no2: null
+  });
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [view, setView] = useState("public"); // 'public', 'user-login', 'admin-login', 'admin'
+  
+  // Citizen Registered User State (Ready for SQL)
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Citizen Registration Form state
+  const [userName, setUserName] = useState("");
+  const [userContact, setUserContact] = useState("");
+  const [userLocation, setUserLocation] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [userMsg, setUserMsg] = useState("");
+  const [userGpsLoading, setUserGpsLoading] = useState(false);
+
+  // Admin login states
+  const [adminUsername, setAdminUsername] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminLoginErr, setAdminLoginErr] = useState("");
+
+  // Citizen report inputs
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [pollType, setPollType] = useState("");
+  const [locName, setLocName] = useState("");
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+
+  // File & Camera states
+  const fileInputRef = useRef(null);
+  const formRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const [cameraActive, setCameraActive] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [locLoading, setLocLoading] = useState(false);
+
+  /* ==================== HIDDEN /admin ROUTE LISTENER ==================== */
+  const checkRoute = () => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    const isAdminPath = path === "/admin" || path.endsWith("/admin") || hash === "#admin";
+
+    if (isAdminPath) {
+      setView(isAdmin ? "admin" : "admin-login");
+    } else {
+      if (!isAdmin && view === "admin") {
+        setView("public");
+      }
+    }
+  };
+
+  useEffect(() => {
+    checkRoute();
+    window.addEventListener("popstate", checkRoute);
+    window.addEventListener("hashchange", checkRoute);
+    return () => {
+      window.removeEventListener("popstate", checkRoute);
+      window.removeEventListener("hashchange", checkRoute);
+    };
+  }, [isAdmin]);
+
+  const navigateTo = (newView, url = "/") => {
+    setView(newView);
+    window.history.pushState({}, "", url);
+  };
+
+  /* ==================== BULLETPROOF CITIZEN GPS AUTO-FILL ==================== */
+  const handleUserGpsAutoFill = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setUserGpsLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const latitude = pos.coords.latitude.toFixed(4);
+        const longitude = pos.coords.longitude.toFixed(4);
+
+        try {
+          // Fetch reverse geocoded address from OpenStreetMap Nominatim
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.address) {
+              const addr = data.address;
+              const locality = addr.suburb || addr.neighbourhood || addr.residential || addr.road || addr.village || "";
+              const city = addr.city || addr.town || addr.state_district || "Indore";
+              const formattedName = locality ? `${locality}, ${city}` : (data.display_name ? data.display_name.split(", ").slice(0, 3).join(", ") : `${latitude}, ${longitude}`);
+              setUserLocation(formattedName);
+            } else if (data && data.display_name) {
+              setUserLocation(data.display_name.split(", ").slice(0, 3).join(", "));
+            } else {
+              setUserLocation(`${latitude}, ${longitude}`);
+            }
+          } else {
+            setUserLocation(`${latitude}, ${longitude}`);
+          }
+        } catch (err) {
+          // If network / CORS fails, coordinates are still guaranteed to populate
+          console.warn("Reverse geocode failed, using coordinates:", err);
+          setUserLocation(`${latitude}, ${longitude}`);
+        } finally {
+          setUserGpsLoading(false);
+        }
+      },
+      (err) => {
+        setUserGpsLoading(false);
+        let msg = "Could not fetch GPS location.";
+        if (err.code === 1) {
+          msg = "Location permission denied. Please click 'Allow' in your browser address bar.";
+        } else if (err.code === 2) {
+          // Common on desktop without GPS chips: provide region fallback
+          setUserLocation("Indore, Madhya Pradesh");
+          return;
+        } else if (err.code === 3) {
+          msg = "Location request timed out. Please enter location manually.";
+        }
+        alert(msg);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  };
+
+  /* ==================== USER REGISTRATION (SQL INTEGRATION) ==================== */
+  const handleUserRegister = (e) => {
+    e.preventDefault();
+
+    if (!userName || !userContact || !userLocation) {
+      setUserMsg("Please fill in Name, Contact, and Location.");
+      return;
+    }
+
+    const userData = {
+      id: Date.now(),
+      name: userName,
+      contact: userContact,
+      location: userLocation,
+      password: userPassword,
+      created_at: new Date().toISOString()
+    };
+
+    setCurrentUser(userData);
+    setLocName(userData.location);
+
+    console.log("SQL INSERT STATEMENT:");
+    console.log(`INSERT INTO users (name, contact, location, password) VALUES ('${userData.name}', '${userData.contact}', '${userData.location}', '${userData.password}');`);
+
+    setUserName("");
+    setUserContact("");
+    setUserLocation("");
+    setUserPassword("");
+    setUserMsg("");
+    
+    alert(`Welcome, ${userData.name}! Profile registered successfully.`);
+    navigateTo("public", "/");
+  };
+
+  const handleUserLogout = () => {
+    setCurrentUser(null);
+    navigateTo("public", "/");
+  };
+
+  /* ==================== ADMIN AUTHENTICATION ==================== */
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    setAdminLoginErr("");
+
+    if (adminUsername === "admin" && adminPassword === "VayuAdmin@2026") {
+      setIsAdmin(true);
+      setView("admin");
+      setAdminUsername("");
+      setAdminPassword("");
+      window.history.pushState({}, "", "/admin");
+    } else {
+      setAdminLoginErr("Invalid admin credentials. Access restricted.");
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    navigateTo("public", "/");
+  };
+
+  const handleVerify = (id) => {
+    setReports(prev => prev.map(r => r.id === id ? { ...r, status: "ADMIN VERIFIED" } : r));
+  };
+
+  const handleReject = (id) => {
+    setReports(prev => prev.map(r => r.id === id ? { ...r, status: "REJECTED" } : r));
+  };
+
+  /* ==================== CAMERA LOGIC ==================== */
+  const startCamera = async () => {
+    try {
+      setCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      alert("Unable to open camera. Please check camera permissions in your browser.");
+      stopCamera();
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const takePhotoSnapshot = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `snap_${Date.now()}.jpg`, { type: "image/jpeg" });
+      handleProcessFile(file);
+      stopCamera();
+    }, "image/jpeg", 0.9);
+  };
+
+  /* ==================== FILE HANDLING ==================== */
+  const handleProcessFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload a valid image file (JPG, PNG, WebP).");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size exceeds 10 MB limit.");
+      return;
+    }
+
+    setSelectedFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setFilePreview(previewUrl);
+
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleProcessFile(e.target.files[0]);
+    }
+  };
+
+  const handleRemoveFile = (e) => {
+    e.stopPropagation();
+    setSelectedFile(null);
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setFilePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  /* ==================== REPORT GEOLOCATION ==================== */
+  const handleReportLocationGPS = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const latitude = pos.coords.latitude.toFixed(4);
+        const longitude = pos.coords.longitude.toFixed(4);
+        setLat(latitude);
+        setLng(longitude);
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.display_name) {
+              setLocName(data.display_name.split(", ").slice(0, 3).join(", "));
+            }
+          }
+        } catch (err) {}
+        setLocLoading(false);
+      },
+      (err) => {
+        setLocLoading(false);
+        alert("Location access unavailable. Please click on the map to set coordinates.");
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  };
+
+  const handleMapLocationSelect = async (clickedLat, clickedLng) => {
+    setLat(clickedLat);
+    setLng(clickedLng);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${clickedLat}&lon=${clickedLng}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.display_name) {
+          setLocName(data.display_name.split(", ").slice(0, 3).join(", "));
+        }
+      }
+    } catch (err) {}
+  };
+
+  /* ==================== REPORT SUBMISSION ==================== */
+  const handleReportSubmit = (e) => {
+    e.preventDefault();
+    if (!lat || !lng) {
+      alert("Please select a location on the map or use the 'Use my location' button.");
+      return;
+    }
+
+    const newReport = {
+      id: Date.now(),
+      title: title || "Unlabeled Smoke Report",
+      type: pollType || "General Emission",
+      desc: desc || "Report submitted by citizen.",
+      lat: parseFloat(lat),
+      lng: parseFloat(lng),
+      locationName: locName || (currentUser ? currentUser.location : "Indore Sector"),
+      status: "PENDING REVIEW",
+      timestamp: "Just now",
+      imageUrl: filePreview,
+      fileName: selectedFile ? selectedFile.name : null,
+      submittedBy: currentUser ? currentUser.name : "Anonymous Citizen"
+    };
+
+    setReports(prev => [newReport, ...prev]);
+
+    setTitle("");
+    setDesc("");
+    setLocName(currentUser ? currentUser.location : "");
+    setSelectedFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    alert("Report logged! Ready to send to your backend.");
+  };
+
+  return (
+    <div className="app">
+      {/* TOPBAR */}
+      <header className="topbar">
+        <div className="brand-section">
+          <div className="brand" onClick={() => navigateTo("public", "/")}>
+            <div 
+              className="brand-icon" 
+              onDoubleClick={(e) => { e.stopPropagation(); navigateTo("admin-login", "/admin"); }}
+              title="Double-click for Admin Access"
+            >
+              👁️
+            </div>
+            <div>
+              <h1>VayuNetra</h1>
+              <span>Indore Air Surveillance & Community Portal</span>
+            </div>
+          </div>
+
+          {/* CITIZEN LOGIN / BADGE */}
+          <div>
+            {currentUser ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="user-badge">
+                  👤 {currentUser.name} ({currentUser.location})
+                </span>
+                <button 
+                  className="btn-brutal" 
+                  style={{ padding: "6px 10px", fontSize: 12 }} 
+                  onClick={handleUserLogout}
+                >
+                  Log Out
+                </button>
+              </div>
+            ) : (
+              <button 
+                className={`btn-brutal ${view === "user-login" ? "btn-yellow" : ""}`} 
+                onClick={() => navigateTo("user-login", "/")}
+              >
+                👤 Citizen Sign In / Register
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* TOPBAR ACTIONS */}
+        <div className="topbar-actions">
+          {isAdmin && (
+            <React.Fragment>
+              <button 
+                className={`btn-brutal ${view === "public" ? "btn-yellow" : ""}`} 
+                onClick={() => navigateTo("public", "/")}
+              >
+                Public Portal
+              </button>
+              <button 
+                className={`btn-brutal ${view === "admin" ? "btn-yellow" : ""}`} 
+                onClick={() => navigateTo("admin", "/admin")}
+              >
+                🛡️ Admin Workspace
+              </button>
+              <button 
+                className="btn-brutal btn-red" 
+                onClick={handleAdminLogout}
+              >
+                Exit Admin
+              </button>
+            </React.Fragment>
+          )}
+        </div>
+      </header>
+
+      {/* ================= 1. CITIZEN REGISTRATION / LOGIN VIEW ================= */}
+      {view === "user-login" && (
+        <div className="centered-card-wrapper">
+          <div className="neo-card">
+            <h2 style={{ fontFamily: "var(--font-head)", fontSize: 22, textTransform: "uppercase" }}>
+              Citizen Profile & Login
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 4 }}>
+              Register your citizen details. Click 'Auto-fill GPS' to instantly populate your location.
+            </p>
+
+            <form onSubmit={handleUserRegister} style={{ marginTop: 18 }}>
+              <label className="input-label">Full Name</label>
+              <input 
+                className="input-text" 
+                placeholder="e.g., Harsh Gupta" 
+                value={userName} 
+                onChange={(e) => setUserName(e.target.value)} 
+                required 
+                autoFocus 
+              />
+
+              <label className="input-label">Email ID or Phone Number</label>
+              <input 
+                className="input-text" 
+                placeholder="e.g., user@example.com or +91 9876543210" 
+                value={userContact} 
+                onChange={(e) => setUserContact(e.target.value)} 
+                required 
+              />
+
+              {/* LOCATION WITH RE-ENGINEERED AUTO-FILL BUTTON */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+                <label className="input-label" style={{ margin: 0 }}>Location (Neighborhood / Sector)</label>
+                <button 
+                  type="button" 
+                  onClick={handleUserGpsAutoFill}
+                  disabled={userGpsLoading}
+                  style={{ 
+                    fontSize: 12, 
+                    fontWeight: 700, 
+                    background: userGpsLoading ? "#FEF9C3" : "none", 
+                    border: "1px solid var(--brand-blue)", 
+                    borderRadius: 4,
+                    padding: "3px 8px",
+                    cursor: userGpsLoading ? "wait" : "pointer", 
+                    color: "var(--brand-blue)" 
+                  }}
+                >
+                  {userGpsLoading ? "⏳ Locating..." : "📍 Auto-fill GPS"}
+                </button>
+              </div>
+              <input 
+                className="input-text" 
+                placeholder="e.g., Vijay Nagar, Indore" 
+                value={userLocation} 
+                onChange={(e) => setUserLocation(e.target.value)} 
+                style={{ marginTop: 6 }} 
+                required 
+              />
+
+              <label className="input-label">Account Password</label>
+              <input 
+                className="input-text" 
+                type="password" 
+                placeholder="Enter password" 
+                value={userPassword} 
+                onChange={(e) => setUserPassword(e.target.value)} 
+                required 
+              />
+
+              {userMsg && (
+                <div style={{ color: "var(--brand-red)", fontSize: 12, fontWeight: 700, marginTop: 10 }}>
+                  {userMsg}
+                </div>
+              )}
+
+              <div style={{ background: "#F4F4F5", padding: 10, borderRadius: 6, fontSize: 11, marginTop: 16, fontFamily: "var(--font-mono)", border: "1px solid #E4E4E7" }}>
+                <b>SQL Ready:</b> Prepares clean record ready for <code>INSERT INTO users</code>.
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                <button 
+                  type="button" 
+                  className="btn-brutal" 
+                  style={{ flex: 1 }} 
+                  onClick={() => navigateTo("public", "/")}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn-brutal btn-yellow" 
+                  style={{ flex: 1 }}
+                >
+                  Save & Login
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= 2. PUBLIC SURVEILLANCE & REPORT VIEW ================= */}
+      {view === "public" && (
+        <React.Fragment>
+          <section className="hero-stats-banner">
+            <div className="banner-header">
+              <span>● LIVE MONITORING: INDORE CORRIDOR</span>
+              <span>{liveMetrics.aqi !== null ? "SYSTEM ACTIVE" : "AWAITING SENSOR FEED"}</span>
+            </div>
+            <div className="banner-grid">
+              <div className="aqi-box">
+                <div className="num" style={{ color: liveMetrics.aqi ? "var(--brand-orange)" : "var(--ink-muted)" }}>
+                  {liveMetrics.aqi ?? "--"}
+                </div>
+                <div className="label" style={{ color: "var(--ink-muted)" }}>
+                  {liveMetrics.status ?? "No Sensor Data"}
+                </div>
+              </div>
+              <div>
+                <div className="gas-row"><span>PM2.5</span><span>{liveMetrics.pm25 ? `${liveMetrics.pm25} µg/m³` : "--"}</span></div>
+                <div className="gas-row"><span>PM10</span><span>{liveMetrics.pm10 ? `${liveMetrics.pm10} µg/m³` : "--"}</span></div>
+              </div>
+              <div>
+                <div className="gas-row"><span>SO₂</span><span>{liveMetrics.so2 ? `${liveMetrics.so2} ppb` : "--"}</span></div>
+                <div className="gas-row"><span>NO₂</span><span>{liveMetrics.no2 ? `${liveMetrics.no2} ppb` : "--"}</span></div>
+              </div>
+            </div>
+          </section>
+
+          <div className="layout-split">
+            <div>
+              <div className="panel" ref={formRef}>
+                <div className="form-title-row">
+                  <div className="form-icon-pill">📄</div>
+                  <div>
+                    <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>Report Pollution</h3>
+                    <p style={{ fontSize: 12.5, color: "var(--ink-muted)" }}>Describe what you observed. Click on the map or use GPS to set coordinates.</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleReportSubmit}>
+                  <label className="input-label">Photo Evidence (Optional)</label>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    accept="image/jpeg,image/png,image/webp" 
+                    onChange={handleFileChange} 
+                    style={{ display: "none" }} 
+                  />
+
+                  {!filePreview ? (
+                    <div 
+                      className={`drop-zone ${isDragging ? "dragging" : ""}`} 
+                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragging(false);
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          handleProcessFile(e.dataTransfer.files[0]);
+                        }
+                      }}
+                    >
+                      <div style={{ fontSize: 26 }}>🖼️</div>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginTop: 6 }}>DRAG & DROP A PHOTO</div>
+                      <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>or click to browse (JPG, PNG, WebP — max 10 MB)</div>
+                    </div>
+                  ) : (
+                    <div className="file-preview-card">
+                      <img src={filePreview} alt="Upload preview" className="file-preview-thumb" />
+                      <div className="file-details">
+                        <strong>{selectedFile?.name}</strong>
+                        <span>{(selectedFile?.size / (1024 * 1024)).toFixed(2)} MB</span>
+                      </div>
+                      <button type="button" className="btn-brutal" style={{ padding: "6px 10px", fontSize: 11, background: "#FEE2E2" }} onClick={handleRemoveFile}>
+                        ✕ Remove
+                      </button>
+                    </div>
+                  )}
+
+                  <label className="input-label">Report Title</label>
+                  <input
+                    className="input-text"
+                    placeholder="e.g., Heavy smoke near industrial area"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+
+                  <label className="input-label">Description</label>
+                  <textarea
+                    className="input-textarea"
+                    placeholder="Describe what you observed — visible smoke, smell, duration..."
+                    value={desc}
+                    onChange={(e) => setDesc(e.target.value)}
+                  />
+
+                  <label className="input-label">Pollution Type</label>
+                  <select className="input-select" value={pollType} onChange={(e) => setPollType(e.target.value)}>
+                    <option value="">Select type (optional)</option>
+                    <option value="Industrial Smoke">Industrial Smoke Plume</option>
+                    <option value="Crop Residue">Crop Residue Burning</option>
+                    <option value="Construction Dust">Construction Dust</option>
+                    <option value="Garbage Burning">Open Garbage Burning</option>
+                  </select>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+                    <label className="input-label" style={{ margin: 0 }}>Location</label>
+                    <button 
+                      type="button" 
+                      onClick={handleReportLocationGPS} 
+                      disabled={locLoading}
+                      style={{ fontSize: 12, fontWeight: 700, background: "none", border: "none", cursor: locLoading ? "wait" : "pointer", color: "var(--brand-blue)" }}
+                    >
+                      {locLoading ? "⏳ Locating..." : "📍 Use my location"}
+                    </button>
+                  </div>
+                  <input
+                    className="input-text"
+                    placeholder="Location name (auto-filled or type manually)"
+                    style={{ marginTop: 6 }}
+                    value={locName}
+                    onChange={(e) => setLocName(e.target.value)}
+                  />
+
+                  <div className="coords-grid">
+                    <input className="input-text" placeholder="Latitude" value={lat} onChange={(e) => setLat(e.target.value)} />
+                    <input className="input-text" placeholder="Longitude" value={lng} onChange={(e) => setLng(e.target.value)} />
+                  </div>
+
+                  <button type="submit" className="submit-btn">✈ Submit Report</button>
+
+                  <div className="notice-box">
+                    <span>⚠️</span>
+                    <span>Click anywhere on the map to pinpoint coordinates accurately.</span>
+                  </div>
+                </form>
+              </div>
+
+              {/* RECENT REPORTS */}
+              <div style={{ marginTop: 24 }}>
+                <h3 style={{ fontSize: 15, textTransform: "uppercase", letterSpacing: "0.05em" }}>Recent Community Reports</h3>
+                {reports.length === 0 ? (
+                  <div className="empty-state">No citizen reports submitted yet.</div>
+                ) : (
+                  reports.map((r) => (
+                    <div key={r.id} className="report-card">
+                      <div className="report-header">
+                        <strong style={{ fontSize: 16 }}>{r.title}</strong>
+                        <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
+                          {r.status}
+                        </span>
+                      </div>
+                      {r.imageUrl && (
+                        <img src={r.imageUrl} alt="Proof" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 6, marginTop: 10, border: "1px solid #E5E5E5" }} />
+                      )}
+                      <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 8 }}>{r.desc}</p>
+                      <div className="coords-time">
+                        <span>📍 {r.lat}, {r.lng} ({r.locationName})</span>
+                        <span>🕒 {r.timestamp}</span>
+                        {r.submittedBy && <span>👤 {r.submittedBy}</span>}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* MAP */}
+            <div className="panel" style={{ height: "fit-content" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>Indore Surveillance Map</h3>
+                <span style={{ fontSize: 11, background: "#FEF08A", padding: "3px 8px", borderRadius: 4, fontWeight: 700 }}>
+                  💡 Click map to pick location
+                </span>
+              </div>
+              <p style={{ fontSize: 12.5, color: "var(--ink-muted)", marginTop: 2 }}>
+                Click anywhere on the map to automatically pin coordinates into the report form.
+              </p>
+              
+              <LeafletMapContainer 
+                zones={zones} 
+                selectedCoords={lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null}
+                onSelectLocation={handleMapLocationSelect} 
+              />
+
+              <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 12, fontWeight: 700 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-green)" }}></span>
+                  &lt; 5 Complaints (Low)
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-orange)" }}></span>
+                  10+ Complaints (Moderate)
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: "var(--brand-red)" }}></span>
+                  50+ Complaints (Critical)
+                </div>
+              </div>
+            </div>
+          </div>
+        </React.Fragment>
+      )}
+
+      {/* ================= 3. DEDICATED /admin LOGIN SCREEN ================= */}
+      {view === "admin-login" && !isAdmin && (
+        <div className="centered-card-wrapper">
+          <div className="neo-card">
+            <h3 style={{ textTransform: "uppercase", fontSize: 20 }}>Admin Verification</h3>
+            <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 4 }}>
+              Enter administrator authorization credentials to access moderation tools.
+            </p>
+
+            <form onSubmit={handleAdminLogin} style={{ marginTop: 18 }}>
+              <label className="input-label">Username</label>
+              <input 
+                className="input-text" 
+                value={adminUsername} 
+                onChange={(e) => setAdminUsername(e.target.value)} 
+                placeholder="admin" 
+                autoFocus 
+                required 
+              />
+
+              <label className="input-label">Password</label>
+              <input 
+                className="input-text" 
+                type="password" 
+                value={adminPassword} 
+                onChange={(e) => setAdminPassword(e.target.value)} 
+                placeholder="Password" 
+                required 
+              />
+
+              {adminLoginErr && (
+                <div style={{ color: "var(--brand-red)", fontSize: 12, fontWeight: 700, marginTop: 10 }}>
+                  {adminLoginErr}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+                <button 
+                  type="button" 
+                  className="btn-brutal" 
+                  style={{ flex: 1 }} 
+                  onClick={() => navigateTo("public", "/")}
+                >
+                  Return to Portal
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn-brutal btn-yellow" 
+                  style={{ flex: 1 }}
+                >
+                  Authenticate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= 4. DEDICATED ADMIN WORKSPACE ================= */}
+      {view === "admin" && isAdmin && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ fontFamily: "var(--font-head)", fontSize: 22, textTransform: "uppercase" }}>
+              Administrator Moderation Workspace
+            </h2>
+            <span style={{ background: "#DCFCE7", color: "#15803D", padding: "6px 12px", borderRadius: 4, fontWeight: 800, fontSize: 12, border: "var(--border-thick)" }}>
+              ● SESSION ACTIVE
+            </span>
+          </div>
+
+          <div className="admin-metrics-row">
+            <div className="metric-card">
+              <div className="num">{reports.length}</div>
+              <div className="label">Total Reports</div>
+            </div>
+            <div className="metric-card">
+              <div className="num" style={{ color: "var(--brand-orange)" }}>
+                {reports.filter(r => r.status === "PENDING REVIEW").length}
+              </div>
+              <div className="label">Pending Review</div>
+            </div>
+            <div className="metric-card">
+              <div className="num" style={{ color: "var(--brand-green)" }}>
+                {reports.filter(r => r.status === "ADMIN VERIFIED").length}
+              </div>
+              <div className="label">Admin Verified</div>
+            </div>
+            <div className="metric-card">
+              <div className="num" style={{ color: "var(--brand-red)" }}>
+                {reports.filter(r => r.status === "REJECTED").length}
+              </div>
+              <div className="label">Rejected</div>
+            </div>
+          </div>
+
+          <div className="panel" style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: 16, textTransform: "uppercase" }}>Incoming Citizen Reports Moderation</h3>
+            <table className="triage-table">
+              <thead>
+                <tr>
+                  <th>Title & Location</th>
+                  <th>Category</th>
+                  <th>Coordinates</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: "center", color: "var(--ink-muted)", padding: "24px" }}>
+                      No reports currently in queue.
+                    </td>
+                  </tr>
+                ) : (
+                  reports.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <strong>{r.title}</strong>
+                        <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{r.locationName}</div>
+                      </td>
+                      <td>{r.type}</td>
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{r.lat}, {r.lng}</td>
+                      <td>
+                        <span className={`badge-status ${r.status === "ADMIN VERIFIED" ? "badge-verified" : r.status === "REJECTED" ? "badge-rejected" : "badge-pending"}`}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td>
+                        {r.status === "PENDING REVIEW" && (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button className="btn-brutal btn-green" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => handleVerify(r.id)}>Verify</button>
+                            <button className="btn-brutal" style={{ padding: "4px 8px", fontSize: 11, background: "#FEE2E2" }} onClick={() => handleReject(r.id)}>Reject</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING CAMERA BUTTON */}
+      {view === "public" && (
+        <button 
+          type="button" 
+          className="floating-camera-btn" 
+          onClick={startCamera}
+        >
+          <span style={{ fontSize: 20 }}>📷</span>
+          <span>Snap & Report</span>
+        </button>
+      )}
+
+      {/* CAMERA MODAL */}
+      {cameraActive && (
+        <div className="modal-overlay" onClick={stopCamera}>
+          <div className="modal-box" style={{ maxWidth: 520, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ textTransform: "uppercase", fontSize: 18, marginBottom: 8 }}>Take Evidence Photo</h3>
+            <div style={{ position: "relative", width: "100%", height: 320, background: "#111", borderRadius: 6, overflow: "hidden", border: "var(--border-thick)" }}>
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+              />
+            </div>
+            <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+              <button type="button" className="btn-brutal" style={{ flex: 1 }} onClick={stopCamera}>
+                Cancel
+              </button>
+              <button type="button" className="btn-brutal btn-yellow" style={{ flex: 1 }} onClick={takePhotoSnapshot}>
+                📸 Capture Photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   LEAFLET MAP COMPONENT
+   ========================================================================= */
+function LeafletMapContainer({ zones, selectedCoords, onSelectLocation }) {
+  const mapRef = useRef(null);
+  const leafletInstance = useRef(null);
+  const markersGroup = useRef(null);
+  const selectedMarker = useRef(null);
+
+  useEffect(() => {
+    if (!leafletInstance.current) {
+      leafletInstance.current = L.map(mapRef.current).setView([22.7196, 75.8577], 11);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 18,
+      }).addTo(leafletInstance.current);
+
+      markersGroup.current = L.layerGroup().addTo(leafletInstance.current);
+
+      leafletInstance.current.on("click", (e) => {
+        if (onSelectLocation) {
+          onSelectLocation(e.latlng.lat.toFixed(4), e.latlng.lng.toFixed(4));
+        }
+      });
+    }
+
+    markersGroup.current.clearLayers();
+
+    zones.forEach(zone => {
+      let markerColor = "#22C55E";
+      let radiusSize = 600;
+
+      if (zone.complaints >= 50) {
+        markerColor = "#EF4444";
+        radiusSize = 2000;
+      } else if (zone.complaints >= 10) {
+        markerColor = "#F97316";
+        radiusSize = 1200;
+      }
+
+      L.circle([zone.lat, zone.lng], {
+        color: markerColor,
+        fillColor: markerColor,
+        fillOpacity: 0.25,
+        radius: radiusSize,
+        weight: 2
+      }).addTo(markersGroup.current);
+
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="dot-marker" style="background:${markerColor}">${zone.complaints}</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      const marker = L.marker([zone.lat, zone.lng], { icon }).addTo(markersGroup.current);
+      marker.bindPopup(`
+        <div style="font-family: 'IBM Plex Sans', sans-serif; min-width: 160px;">
+          <h4 style="margin: 0 0 4px; font-size: 14px;">${zone.name}</h4>
+          <div style="font-size: 12px; margin-top: 4px;">Registered Complaints: <strong>${zone.complaints}</strong></div>
+        </div>
+      `);
+    });
+  }, [zones]);
+
+  useEffect(() => {
+    if (!leafletInstance.current) return;
+
+    if (selectedMarker.current) {
+      leafletInstance.current.removeLayer(selectedMarker.current);
+      selectedMarker.current = null;
+    }
+
+    if (selectedCoords && !isNaN(selectedCoords.lat) && !isNaN(selectedCoords.lng)) {
+      const pinIcon = L.divIcon({
+        className: "",
+        html: `<div style="font-size: 26px; transform: translate(-10px, -24px);">📍</div>`,
+        iconSize: [30, 30]
+      });
+
+      selectedMarker.current = L.marker([selectedCoords.lat, selectedCoords.lng], { icon: pinIcon })
+        .addTo(leafletInstance.current)
+        .bindPopup("Selected Report Location")
+        .openPopup();
+
+      leafletInstance.current.panTo([selectedCoords.lat, selectedCoords.lng]);
+    }
+  }, [selectedCoords]);
+
+  return <div id="leaflet-map" ref={mapRef}></div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
