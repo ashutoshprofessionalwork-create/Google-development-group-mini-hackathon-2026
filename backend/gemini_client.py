@@ -4,9 +4,10 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-# The client automatically picks up the GEMINI_API_KEY environment variable
-api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key) if api_key else None
+# Fallback default API key if GEMINI_API_KEY environment variable is not explicitly set
+DEFAULT_API_KEY = "AQ.Ab8RN6LL-K4FErOkevYNdeZXtf-33yhDwVuq62_Od0XPb_SBpw"
+api_key = os.getenv("GEMINI_API_KEY", DEFAULT_API_KEY)
+client = genai.Client(api_key=api_key)
 
 
 class PollutionReport(BaseModel):
@@ -23,10 +24,6 @@ class PollutionReport(BaseModel):
 
 
 def analyze_pollution_image(image_bytes: bytes, mime_type: str) -> PollutionReport:
-    global client
-    if client is None:
-        client = genai.Client()
-
     image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
 
     response = client.models.generate_content(
