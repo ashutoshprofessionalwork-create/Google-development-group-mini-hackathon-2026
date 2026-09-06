@@ -91,7 +91,7 @@ def get_metrics():
 
 
 @app.get("/reports")
-def get_reports(sort_by_severity: bool = True):
+def get_reports(request: Request, sort_by_severity: bool = False):
     conn = get_db()
     cursor = conn.cursor()
     if sort_by_severity:
@@ -99,6 +99,11 @@ def get_reports(sort_by_severity: bool = True):
     else:
         cursor.execute("SELECT * FROM reports ORDER BY id DESC")
     rows = cursor.fetchall()
+    
+    host = request.headers.get("host") or "localhost:8000"
+    scheme = request.url.scheme or "http"
+    base_url = f"{scheme}://{host}"
+
     reports = []
     for row in rows:
         lat = row["lat"] if row["lat"] else 22.7196
@@ -107,6 +112,11 @@ def get_reports(sort_by_severity: bool = True):
         rep_count = row["report_count"] if ("report_count" in row.keys() and row["report_count"]) else 1
         raw_status = row["status"] if "status" in row.keys() else "PENDING REVIEW"
         
+        # Format image_url
+        img_url = row["image_url"] or ""
+        if img_url.startswith("/"):
+            img_url = f"{base_url}{img_url}"
+
         # Closest station comparison
         closest = find_closest_station(lat, lon)
         aqi_delta = est_aqi - closest["station_aqi"]
@@ -141,7 +151,7 @@ def get_reports(sort_by_severity: bool = True):
                 "delta": f"+{aqi_delta}" if aqi_delta > 0 else f"{aqi_delta}"
             },
             "timestamp": "Recent",
-            "imageUrl": row["image_url"],
+            "imageUrl": img_url,
             "analysis": {
                 "pollution_type": row["pollution_type"],
                 "severity": row["severity"],

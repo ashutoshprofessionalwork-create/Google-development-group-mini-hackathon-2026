@@ -173,7 +173,9 @@ function App() {
   const [locLoading, setLocLoading] = useState(false);
 
   /* ==================== API BASE URL ==================== */
-  const API_BASE = `http://${window.location.hostname || 'localhost'}:8000`;
+  const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.')
+    ? `http://${window.location.hostname}:8000`
+    : 'https://vayunetra-backend.onrender.com'; // Replace with your live Render backend URL after deployment
 
   /* ==================== FETCH BACKEND DATA ==================== */
   const fetchBackendData = async () => {
@@ -384,7 +386,7 @@ function App() {
     e.preventDefault();
     setAdminLoginErr("");
 
-    if (adminUsername === "admin" && adminPassword === "VayuAdmin@2026") {
+    if (adminUsername === "admin" && adminPassword === "123") {
       setIsAdmin(true);
       setView("admin");
       setAdminUsername("");
@@ -675,7 +677,7 @@ function App() {
           >
             🗺️ Live Map & Report
           </button>
-          {isAdmin ? (
+          {isAdmin && (
             <React.Fragment>
               <button 
                 className={`btn-brutal ${view === "admin" ? "btn-yellow" : ""}`} 
@@ -690,14 +692,6 @@ function App() {
                 Exit Admin
               </button>
             </React.Fragment>
-          ) : (
-            <button 
-              className="btn-brutal" 
-              onClick={() => navigateTo("admin-login", "/admin")}
-              style={{ fontSize: 12, opacity: 0.8 }}
-            >
-              🔐 Admin Portal
-            </button>
           )}
         </div>
       </header>
@@ -760,19 +754,19 @@ function App() {
           <div className="panel" style={{ marginTop: 28 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <div>
-                <h3 style={{ fontSize: 18, textTransform: "uppercase" }}>🔥 High-Priority Pollution Incidents</h3>
+                <h3 style={{ fontSize: 18, textTransform: "uppercase" }}>🔥 Real-Time Severity Priority Board</h3>
                 <p style={{ fontSize: 13, color: "var(--ink-muted)" }}>
-                  Incidents automatically ranked by Gemini AI Severity Level (Score 10 to 1). Critical violations listed first.
+                  Pollution reports automatically sorted by Gemini AI Severity score (High Priority 10/10 to Low Priority 1/10).
                 </p>
               </div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <button 
                   className={`btn-brutal ${sortBySeverity ? "btn-yellow" : ""}`} 
                   style={{ fontSize: 12, padding: "6px 12px" }}
                   onClick={() => setSortBySeverity(true)}
                 >
-                  ⚡ Sort by Severity (Priority)
+                  ⚡ Sort High to Low Priority
                 </button>
                 <button 
                   className={`btn-brutal ${!sortBySeverity ? "btn-yellow" : ""}`} 
@@ -784,7 +778,81 @@ function App() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16, marginTop: 18 }}>
+            {/* REAL-TIME SEVERITY PRIORITY TABLE */}
+            <div style={{ overflowX: "auto", marginTop: 18 }}>
+              <table className="triage-table">
+                <thead>
+                  <tr>
+                    <th>Priority / Severity Score</th>
+                    <th>Incident Title</th>
+                    <th>Type & Estimated AQI</th>
+                    <th>Location & Coordinates</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedReports.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: "center", color: "var(--ink-muted)", padding: "20px" }}>
+                        No pollution complaints submitted yet. Use 'Snap & Report' above.
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedReports.map((r) => {
+                      const score = getSeverityScore(r);
+                      const badge = getSeverityBadge(score);
+                      return (
+                        <tr key={r.id}>
+                          <td>
+                            <span style={{ background: badge.bg, color: badge.color, fontWeight: 800, fontSize: 11, padding: "4px 8px", borderRadius: 4, border: `1px solid ${badge.border}`, display: "inline-block" }}>
+                              {badge.label}
+                            </span>
+                          </td>
+                          <td>
+                            <strong>{r.title}</strong>
+                            {r.imageUrl && (
+                              <div style={{ marginTop: 4 }}>
+                                <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--brand-blue)", textDecoration: "underline" }}>
+                                  🖼️ View Photo Evidence
+                                </a>
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{r.analysis?.pollution_type || "Air Pollution"}</div>
+                            <div style={{ fontSize: 11.5, color: "#C2410C", fontWeight: 700 }}>
+                              ⚡ Est. AQI: {r.estimated_aqi || (100 + score * 28)}
+                            </div>
+                          </td>
+                          <td style={{ fontSize: 11.5 }}>
+                            <div>📍 {r.locationName || "Indore"}</div>
+                            <div style={{ fontFamily: "var(--font-mono)", color: "var(--ink-muted)", fontSize: 11 }}>
+                              ({r.lat}, {r.lng})
+                            </div>
+                          </td>
+                          <td>
+                            {renderVerificationBadge(r)}
+                          </td>
+                          <td>
+                            <button 
+                              className="btn-brutal btn-yellow" 
+                              style={{ padding: "4px 8px", fontSize: 11, whiteSpace: "nowrap" }}
+                              onClick={() => setAuthorityAlert(r)}
+                            >
+                              🚨 Dispatch Alert
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* CARD GRID VIEW BELOW */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16, marginTop: 24 }}>
               {sortedReports.length === 0 ? (
                 <div className="empty-state" style={{ gridColumn: "1 / -1" }}>
                   No reports logged yet. Use 'Snap & Report' to submit photo evidence.
