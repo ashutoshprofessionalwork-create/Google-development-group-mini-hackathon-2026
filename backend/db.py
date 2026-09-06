@@ -21,7 +21,7 @@ def seed_mock_data(conn):
             0.98,
             22.7712,
             75.9012,
-            "http://localhost:8000/mockdatapic/istockphoto-458921925-612x612.jpg",
+            "/mockdatapic/istockphoto-458921925-612x612.jpg",
             False,
             "ADMIN VERIFIED"
         ),
@@ -33,7 +33,7 @@ def seed_mock_data(conn):
             0.95,
             22.6148,
             75.6811,
-            "http://localhost:8000/mockdatapic/istockphoto-1434607739-612x612.jpg",
+            "/mockdatapic/istockphoto-1434607739-612x612.jpg",
             False,
             "PENDING REVIEW"
         ),
@@ -45,7 +45,7 @@ def seed_mock_data(conn):
             0.93,
             22.7820,
             75.8940,
-            "http://localhost:8000/mockdatapic/istockphoto-1434610444-612x612.jpg",
+            "/mockdatapic/istockphoto-1434610444-612x612.jpg",
             False,
             "ADMIN VERIFIED"
         ),
@@ -57,7 +57,7 @@ def seed_mock_data(conn):
             0.92,
             22.7244,
             75.8839,
-            "http://localhost:8000/mockdatapic/istockphoto-2175083463-612x612.jpg",
+            "/mockdatapic/istockphoto-2175083463-612x612.jpg",
             False,
             "ADMIN VERIFIED"
         ),
@@ -69,7 +69,7 @@ def seed_mock_data(conn):
             0.90,
             22.7533,
             75.8937,
-            "http://localhost:8000/mockdatapic/istockphoto-174655376-612x612.jpg",
+            "/mockdatapic/istockphoto-174655376-612x612.jpg",
             False,
             "PENDING REVIEW"
         ),
@@ -81,7 +81,7 @@ def seed_mock_data(conn):
             0.89,
             22.7301,
             75.8712,
-            "http://localhost:8000/mockdatapic/istockphoto-1272077322-612x612.jpg",
+            "/mockdatapic/istockphoto-1272077322-612x612.jpg",
             False,
             "PENDING REVIEW"
         ),
@@ -93,7 +93,7 @@ def seed_mock_data(conn):
             0.88,
             22.6321,
             75.8052,
-            "http://localhost:8000/mockdatapic/istockphoto-1438168626-612x612.jpg",
+            "/mockdatapic/istockphoto-1438168626-612x612.jpg",
             False,
             "ADMIN VERIFIED"
         ),
@@ -105,7 +105,7 @@ def seed_mock_data(conn):
             0.87,
             22.7015,
             75.8621,
-            "http://localhost:8000/mockdatapic/istockphoto-2175776925-612x612.jpg",
+            "/mockdatapic/istockphoto-2175776925-612x612.jpg",
             False,
             "PENDING REVIEW"
         ),
@@ -117,7 +117,7 @@ def seed_mock_data(conn):
             0.85,
             22.6916,
             75.8672,
-            "http://localhost:8000/mockdatapic/istockphoto-2165806976-612x612.jpg",
+            "/mockdatapic/istockphoto-2165806976-612x612.jpg",
             False,
             "PENDING REVIEW"
         ),
@@ -129,7 +129,7 @@ def seed_mock_data(conn):
             0.83,
             22.6781,
             75.8245,
-            "http://localhost:8000/mockdatapic/istockphoto-490452539-612x612.jpg",
+            "/mockdatapic/istockphoto-490452539-612x612.jpg",
             False,
             "ADMIN VERIFIED"
         ),
@@ -141,7 +141,7 @@ def seed_mock_data(conn):
             0.82,
             22.7180,
             75.8560,
-            "http://localhost:8000/mockdatapic/istockphoto-638167868-612x612.jpg",
+            "/mockdatapic/istockphoto-638167868-612x612.jpg",
             False,
             "PENDING REVIEW"
         ),
@@ -153,7 +153,7 @@ def seed_mock_data(conn):
             0.81,
             22.7351,
             75.8890,
-            "http://localhost:8000/mockdatapic/istockphoto-534781505-612x612.jpg",
+            "/mockdatapic/istockphoto-534781505-612x612.jpg",
             False,
             "REJECTED"
         ),
@@ -165,7 +165,7 @@ def seed_mock_data(conn):
             0.79,
             22.7610,
             75.8210,
-            "http://localhost:8000/mockdatapic/istockphoto-915098414-612x612.jpg",
+            "/mockdatapic/istockphoto-915098414-612x612.jpg",
             False,
             "REJECTED"
         )

@@ -172,14 +172,17 @@ function App() {
   const streamRef = useRef(null);
   const [locLoading, setLocLoading] = useState(false);
 
+  /* ==================== API BASE URL ==================== */
+  const API_BASE = `http://${window.location.hostname || 'localhost'}:8000`;
+
   /* ==================== FETCH BACKEND DATA ==================== */
   const fetchBackendData = async () => {
     try {
       const [mRes, zRes, rRes, fRes] = await Promise.allSettled([
-        fetch("http://localhost:8000/metrics"),
-        fetch("http://localhost:8000/zones"),
-        fetch("http://localhost:8000/reports"),
-        fetch("http://localhost:8000/forecast")
+        fetch(`${API_BASE}/metrics`),
+        fetch(`${API_BASE}/zones`),
+        fetch(`${API_BASE}/reports`),
+        fetch(`${API_BASE}/forecast`)
       ]);
 
       if (mRes.status === "fulfilled" && mRes.value.ok) {
@@ -400,7 +403,7 @@ function App() {
   const handleVerify = async (id) => {
     setReports(prev => prev.map(r => r.id === id ? { ...r, status: "ADMIN VERIFIED" } : r));
     try {
-      await fetch(`http://localhost:8000/reports/${id}/status`, {
+      await fetch(`${API_BASE}/reports/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "ADMIN VERIFIED" })
@@ -413,7 +416,7 @@ function App() {
   const handleReject = async (id) => {
     setReports(prev => prev.map(r => r.id === id ? { ...r, status: "REJECTED" } : r));
     try {
-      await fetch(`http://localhost:8000/reports/${id}/status`, {
+      await fetch(`${API_BASE}/reports/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "REJECTED" })
@@ -567,7 +570,7 @@ function App() {
         formData.append("lat", lat);
         formData.append("lon", lng);
 
-        const res = await fetch("http://localhost:8000/report", {
+        const res = await fetch(`${API_BASE}/report`, {
           method: "POST",
           body: formData,
         });

@@ -216,7 +216,9 @@ async def create_report(
     try:
         with open(save_path, "wb") as f:
             f.write(image_bytes)
-        image_url = f"http://localhost:8000/mockdatapic/{save_filename}"
+        host = request.headers.get("host") or "localhost:8000"
+        scheme = request.url.scheme or "http"
+        image_url = f"{scheme}://{host}/mockdatapic/{save_filename}"
     except Exception:
         image_url = f"https://storage.googleapis.com/vayunetra-mock/{file.filename}"
 
