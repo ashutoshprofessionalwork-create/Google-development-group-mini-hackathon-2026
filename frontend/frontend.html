@@ -452,26 +452,55 @@ function App() {
   };
 
   /* ==================== REPORT SUBMISSION ==================== */
-  const handleReportSubmit = (e) => {
+  const handleReportSubmit = async (e) => {
     e.preventDefault();
     if (!lat || !lng) {
       alert("Please select a location on the map or use the 'Use my location' button.");
       return;
     }
 
+    let resultAnalysis = null;
+    let newReportId = Date.now();
+
+    if (selectedFile) {
+      try {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("lat", lat);
+        formData.append("lon", lng);
+
+        const res = await fetch("http://localhost:8000/report", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server returned status ${res.status}`);
+        }
+
+        const data = await res.json();
+        resultAnalysis = data.analysis;
+        if (data.report_id) newReportId = data.report_id;
+      } catch (err) {
+        alert("Failed to analyze image with backend: " + err.message);
+        return;
+      }
+    }
+
     const newReport = {
-      id: Date.now(),
-      title: title || "Unlabeled Smoke Report",
-      type: pollType || "General Emission",
-      desc: desc || "Report submitted by citizen.",
+      id: newReportId,
+      title: title || (resultAnalysis ? `${resultAnalysis.pollution_type} (Severity ${resultAnalysis.severity}/10)` : "Unlabeled Smoke Report"),
+      type: resultAnalysis?.pollution_type || pollType || "General Emission",
+      desc: desc || (resultAnalysis ? `Confidence: ${(resultAnalysis.confidence * 100).toFixed(0)}%. Spam: ${resultAnalysis.is_spam ? "Yes" : "No"}` : "Report submitted by citizen."),
       lat: parseFloat(lat),
       lng: parseFloat(lng),
       locationName: locName || (currentUser ? currentUser.location : "Indore Sector"),
-      status: "PENDING REVIEW",
+      status: resultAnalysis?.is_spam ? "REJECTED (SPAM)" : "PENDING REVIEW",
       timestamp: "Just now",
       imageUrl: filePreview,
       fileName: selectedFile ? selectedFile.name : null,
-      submittedBy: currentUser ? currentUser.name : "Anonymous Citizen"
+      submittedBy: currentUser ? currentUser.name : "Anonymous Citizen",
+      analysis: resultAnalysis
     };
 
     setReports(prev => [newReport, ...prev]);
@@ -483,7 +512,7 @@ function App() {
     setFilePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    alert("Report logged! Ready to send to your backend.");
+    alert("Report logged and analyzed successfully!");
   };
 
   return (
@@ -815,6 +844,13 @@ function App() {
                       </div>
                       {r.imageUrl && (
                         <img src={r.imageUrl} alt="Proof" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 6, marginTop: 10, border: "1px solid #E5E5E5" }} />
+                      )}
+                      {r.analysis && (
+                        <div style={{ marginTop: 10, padding: 10, background: "#F4F4F5", borderRadius: 6, fontSize: 12, border: "1px solid #E4E4E7" }}>
+                          <div><strong>Gemini AI Analysis:</strong></div>
+                          <div>Type: {r.analysis.pollution_type} | Severity: {r.analysis.severity}/10</div>
+                          <div>Confidence: {(r.analysis.confidence * 100).toFixed(0)}% | Spam Flagged: {r.analysis.is_spam ? "Yes ⚠️" : "No ✅"}</div>
+                        </div>
                       )}
                       <p style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 8 }}>{r.desc}</p>
                       <div className="coords-time">

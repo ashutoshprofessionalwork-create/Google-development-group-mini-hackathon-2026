@@ -26,8 +26,17 @@ class PollutionReport(BaseModel):
 def analyze_pollution_image(image_bytes: bytes, mime_type: str) -> PollutionReport:
     image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
 
+    if not os.getenv("GEMINI_API_KEY") and api_key == DEFAULT_API_KEY:
+        # Fallback mock response for offline / unauthenticated local development & testing
+        return PollutionReport(
+            pollution_type="Smoke (Mocked - Set GEMINI_API_KEY)",
+            severity=6,
+            confidence=0.88,
+            is_spam=False
+        )
+
     response = client.models.generate_content(
-        model="gemini-3.6-flash",
+        model="gemini-2.5-flash",
         contents=[
             image_part,
             "Analyze this image for air pollution hotspots. Output strictly using the required JSON schema.",

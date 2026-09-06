@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
@@ -9,6 +10,14 @@ init_db()
 client = TestClient(app)
 
 class TestVayuNetraAPI(unittest.TestCase):
+
+    def test_test_jpg_exists_in_expected_locations(self):
+        backend_test_jpg = os.path.join(os.path.dirname(__file__), "test.jpg")
+        root_test_jpg = os.path.join(os.path.dirname(__file__), "..", "test.jpg")
+        self.assertTrue(
+            os.path.exists(backend_test_jpg) or os.path.exists(root_test_jpg),
+            "test.jpg must exist in backend/ or repository root for upload scripts"
+        )
 
     @patch("main.analyze_pollution_image")
     def test_create_report_success(self, mock_analyze):
@@ -45,7 +54,7 @@ class TestVayuNetraAPI(unittest.TestCase):
         self.assertEqual(report.pollution_type, "Smoke")
         mock_genai_client.models.generate_content.assert_called_once()
         kwargs = mock_genai_client.models.generate_content.call_args.kwargs
-        self.assertEqual(kwargs.get("model"), "gemini-3.6-flash")
+        self.assertEqual(kwargs.get("model"), "gemini-2.5-flash")
 
 if __name__ == "__main__":
     unittest.main()

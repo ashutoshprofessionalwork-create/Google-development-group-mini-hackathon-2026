@@ -1,0 +1,11 @@
+cd backend
+python -m uvicorn main:app --reload
+
+to kill server  > Stop-Process -Id (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue).OwningProcess -Force
+
+
+"import requests; r = requests.post('http://127.0.0.1:8000/report', files={'file': open('test.jpg', 'rb')}, data={'lat': 22.7196, 'lon': 75.8577}); print(r.json())"
+
+Start-Process "frontend/frontend.html"
+
+json read cmnd > Get-Content gemini_response.json
